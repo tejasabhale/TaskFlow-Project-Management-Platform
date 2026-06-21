@@ -5,6 +5,7 @@ import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import jwt from "jsonwebtoken";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -38,7 +39,7 @@ const register = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required!");
   }
   const existedUser = await User.findOne({
-    $or: [{ userName }, { email }],
+    $or: [{ userName }, { email }, { mobileNo }],
   });
   if (existedUser) {
     throw new ApiError(409, "User with same email or username already exists!");
@@ -84,6 +85,16 @@ const verifyOtp = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email and OTP are required!");
   }
 
+  const existingUser = await User.findOne({ email });
+
+  if (!existingUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (existingUser.isVerified) {
+    throw new ApiError(400, "User is already verified");
+  }
+
   const otpRecord = await Otp.findOne({
     email,
     action: "registration",
@@ -94,8 +105,11 @@ const verifyOtp = asyncHandler(async (req, res) => {
   if (!otpRecord) {
     throw new ApiError(400, "No OTP found!");
   }
+  if (otpRecord.expiresAt < new Date()) {
+    throw new ApiError(400, "OTP has expired");
+  }
 
-  const isOtpValid = bcrypt.compare(otp.toString(), otpRecord.otp);
+  const isOtpValid = await bcrypt.compare(otp.toString(), otpRecord.otp);
 
   if (!isOtpValid) {
     throw new ApiError(400, "Invalid OTP");
@@ -146,6 +160,10 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
+  if (!user.isVerified) {
+    throw new ApiError(403, "Please verify your account first");
+  }
+
   const isPasswordValid = await user.isPasswordCorrect(password);
 
   if (!isPasswordValid) {
@@ -157,33 +175,88 @@ const login = asyncHandler(async (req, res) => {
   );
   const loggedInUser = await User.findById(user._id);
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        user: loggedInUser,
-        accessToken,
-        refreshToken,
-        verified: true,
-      },
-      "User logged in successfully",
-    ),
-  );
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          verified: true,
+        },
+        "User logged in successfully",
+      ),
+    );
 });
 
-const logout = asyncHandler(async(req, res)=>{
-  await User.findByIdAndUpdate(
-    req.user._id,
-    {
-      $unset: { refreshToken: 1}
+const logout = asyncHandler(async (req, res) => {
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  };
+  await User.findByIdAndUpdate(req.user._id, {
+    $unset: {
+      refreshToken: 1,
     },
-    {
-      new: true
-    }
-  )
-  return res.status(200).json(
-    new ApiResponse(200, {}, "User logged out.")
-  )
-})
+  });
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged out."));
+});
 
-export { register, verifyOtp, login, logout };
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefreshToken = req.cookies?.refreshToken;
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, "Refresh token missing");
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET,
+    );
+  } catch (error) {
+    throw new ApiError(401, "Invalid or expired refresh token");
+  }
+  const user = await User.findById(decoded._id).select("+refreshToken");
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  if (incomingRefreshToken !== user.refreshToken) {
+    throw new ApiError(401, "Invalid refresh token");
+  }
+  if (!user.isVerified) {
+    throw new ApiError(403, "User is not verified");
+  }
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    user._id,
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(new ApiResponse(200, {}, "Access token refreshed successfully"));
+});
+
+export { register, verifyOtp, login, logout, refreshAccessToken };
