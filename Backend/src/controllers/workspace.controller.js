@@ -1,3 +1,4 @@
+import { User } from "../models/user.model.js";
 import { Workspace } from "../models/workspace.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -66,12 +67,12 @@ const updateWorkspace = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
   const { workspaceId } = req.params;
   if (name !== undefined && !name.trim()) {
-  throw new ApiError(400, "Name is required");
-}
+    throw new ApiError(400, "Name is required");
+  }
 
-if (description !== undefined && !description.trim()) {
-  throw new ApiError(400, "Description is required");
-}
+  if (description !== undefined && !description.trim()) {
+    throw new ApiError(400, "Description is required");
+  }
 
   if (name) {
     const exists = await Workspace.findOne({
@@ -124,10 +125,97 @@ const deleteWorkspace = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Workspace deleted successfully!"));
 });
 
+const getWorkspaceMembers = asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+  const workspace = await Workspace.findById(workspaceId).populate(
+    "members.user",
+    "fullName email avatar",
+  );
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+  const member = workspace.members.find(
+    (m) => m.user._id.toString() === req.user._id.toString(),
+  );
+  if (!member) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, workspace.members, "Members fetched successfully."),
+    );
+});
+
+const addWorkspaceMembers = asyncHandler(async (req, res) => {
+  const { email, role } = req.body;
+  if (!email?.trim()) {
+    throw new ApiError(400, "Email is required");
+  }
+
+  const memberRole = role || "member";
+  if (!["member", "admin"].includes(memberRole)) {
+    throw new ApiError(400, "Invalid role");
+  }
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const { workspaceId } = req.params;
+
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+
+  const member = workspace.members.find(
+    (m) => m.user.toString() === req.user._id.toString(),
+  );
+
+  if (!member || !["admin", "owner"].includes(member.role)) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+   const user = await User.findOne({ email: normalizedEmail });
+
+  if (!user) {
+    throw new ApiError(404, "User not found.");
+  }
+
+
+  if (user._id.toString() === req.user._id.toString()) {
+    throw new ApiError(400, "You are already a member");
+  }
+
+  const alreadyMember = workspace.members.some(
+    (m) => m.user.toString() === user._id.toString(),
+  );
+
+  if (alreadyMember) {
+    throw new ApiError(409, "User already a member");
+  }
+
+  workspace.members.push({
+    user: user._id,
+    role: memberRole,
+  });
+  await workspace.save();
+
+  await workspace.populate("members.user", "fullName email avatar");
+
+  const addedMember = workspace.members[workspace.members.length - 1];
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, addedMember, "Member added successfully."));
+});
+
 export {
   createWorkspace,
   getWorkspaces,
   getWorkspaceById,
   updateWorkspace,
   deleteWorkspace,
+  getWorkspaceMembers,
+  addWorkspaceMembers,
 };
