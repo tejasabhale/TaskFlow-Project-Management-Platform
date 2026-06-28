@@ -176,12 +176,18 @@ const addWorkspaceMembers = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Access denied.");
   }
 
-   const user = await User.findOne({ email: normalizedEmail });
+  const user = await User.findOne({ email: normalizedEmail });
 
   if (!user) {
     throw new ApiError(404, "User not found.");
   }
 
+  if (!user.isVerified) {
+    throw new ApiError(
+      403,
+      "User must verify their email before being added to a workspace.",
+    );
+  }
 
   if (user._id.toString() === req.user._id.toString()) {
     throw new ApiError(400, "You are already a member");

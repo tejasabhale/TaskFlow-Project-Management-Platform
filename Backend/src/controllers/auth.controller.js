@@ -7,6 +7,9 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 
+const OTP_EXPIRY = 5 * 60 * 1000;
+const OTP_COOLDOWN = 60 * 1000;
+
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -20,10 +23,6 @@ const clearCookieOptions = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict",
   path: "/",
-};
-
-const generateOtp = () => {
-  return crypto.randomInt(100000, 1000000).toString();
 };
 
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -47,18 +46,20 @@ const generateAccessAndRefreshTokens = async (userId) => {
   }
 };
 
+const generateOtp = () => {
+  return crypto.randomInt(100000, 1000000).toString();
+};
+
 const register = asyncHandler(async (req, res) => {
   const { userName, fullName, mobileNo, password, email } = req.body;
   if (
-    [userName, fullName, email, password].some(
-      (field) => field?.trim() === "",
-    ) ||
-    !mobileNo
+    [userName, fullName, email, password].some((field) => !field?.trim()) ||
+    !mobileNo?.toString()?.trim()
   ) {
     throw new ApiError(400, "All fields are required!");
   }
-  const normalizedUserName = userName.toLowerCase();
-  const normalizedEmail = email.toLowerCase();
+  const normalizedUserName = userName.trim().toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
 
   const existedUser = await User.findOne({
     $or: [
@@ -98,7 +99,7 @@ const register = asyncHandler(async (req, res) => {
     email: normalizedEmail,
     otp: hashedOtp,
     action: "registration",
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    expiresAt: new Date(Date.now() + OTP_EXPIRY),
   });
   return res.status(201).json(
     new ApiResponse(
@@ -114,11 +115,11 @@ const register = asyncHandler(async (req, res) => {
 const verifyOtp = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
-  if (!email || !otp) {
+  if (!email?.trim() || !otp?.trim()) {
     throw new ApiError(400, "Email and OTP are required!");
   }
 
-  const normalizedEmail = email.toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
 
   if (!/^\d{6}$/.test(otp.toString())) {
     throw new ApiError(400, "Invalid OTP format");
@@ -148,15 +149,22 @@ const verifyOtp = asyncHandler(async (req, res) => {
     throw new ApiError(400, "OTP has expired");
   }
 
+  if (otpRecord.attempts >= 5) {
+    throw new ApiError(429, "Too many invalid attempts.");
+  }
+
   const isOtpValid = await bcrypt.compare(otp.toString(), otpRecord.otp);
 
   if (!isOtpValid) {
+    otpRecord.attempts++;
+    await otpRecord.save();
     throw new ApiError(400, "Invalid OTP");
   }
 
   const user = await User.findOneAndUpdate(
     {
       email: normalizedEmail,
+      isVerified: false,
     },
     {
       $set: { isVerified: true },
@@ -175,24 +183,39 @@ const verifyOtp = asyncHandler(async (req, res) => {
     action: "registration",
   });
 
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    user._id,
+  );
+
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "User verified successfully!"));
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user,
+          verified: true,
+        },
+        "User verified successfully.",
+      ),
+    );
 });
 
 const login = asyncHandler(async (req, res) => {
   const { userName, email, password } = req.body;
 
-  if (!(userName || email)) {
+  if (!(userName?.trim() || email?.trim())) {
     throw new ApiError(400, "Username or Email is required");
   }
 
-  if (!password) {
+  if (!password?.trim()) {
     throw new ApiError(400, "Password is required");
   }
 
-  const normalizedUserName = userName?.toLowerCase();
-  const normalizedEmail = email?.toLowerCase();
+  const normalizedUserName = userName?.trim().toLowerCase();
+  const normalizedEmail = email?.trim().toLowerCase();
 
   const user = await User.findOne({
     $or: [{ userName: normalizedUserName }, { email: normalizedEmail }],
@@ -282,4 +305,58 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Access token refreshed successfully"));
 });
 
-export { register, verifyOtp, login, logout, refreshAccessToken };
+const resendOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email?.trim()) {
+    throw new ApiError(400, "Email is required.");
+  }
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    throw new ApiError(404, "User not found, please register.");
+  }
+  if (user.isVerified) {
+    throw new ApiError(400, "User is already verified.");
+  }
+
+  const recentOtp = await Otp.findOne({
+    email: normalizedEmail,
+    action: "registration",
+  }).sort({ createdAt: -1 });
+
+  if (recentOtp && Date.now() - recentOtp.createdAt.getTime() < OTP_COOLDOWN) {
+    throw new ApiError(
+      429,
+      "Please wait 60 seconds before requesting another OTP.",
+    );
+  }
+
+  const otp = generateOtp();
+  const hashedOtp = await bcrypt.hash(otp, 10);
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`OTP for ${normalizedEmail} is ${otp}`);
+  }
+  await Otp.deleteMany({
+    email: normalizedEmail,
+    action: "registration",
+  });
+
+  await Otp.create({
+    email: normalizedEmail,
+    otp: hashedOtp,
+    action: "registration",
+    expiresAt: new Date(Date.now() + OTP_EXPIRY),
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { email: normalizedEmail },
+        "Otp sent successfully.",
+      ),
+    );
+});
+
+export { register, verifyOtp, login, logout, refreshAccessToken, resendOtp };
