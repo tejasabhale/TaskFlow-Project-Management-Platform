@@ -115,7 +115,7 @@ const register = asyncHandler(async (req, res) => {
 const verifyOtp = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
-  if (!email?.trim() || !otp?.trim()) {
+  if (!email?.trim() || !otp) {
     throw new ApiError(400, "Email and OTP are required!");
   }
 

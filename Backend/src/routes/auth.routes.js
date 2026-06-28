@@ -4,6 +4,7 @@ import {
   logout,
   refreshAccessToken,
   register,
+  resendOtp,
   verifyOtp,
 } from "../controllers/auth.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -15,5 +16,6 @@ router.post("/verify-otp", verifyOtp);
 router.post("/login", login);
 router.post("/logout", verifyJWT, logout);
 router.post("/refresh-access-token", refreshAccessToken);
+router.post("/resend-otp", resendOtp);
 
 export default router;
