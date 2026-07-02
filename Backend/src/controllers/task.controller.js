@@ -4,6 +4,7 @@ import { Workspace } from "../models/workspace.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 const createTask = asyncHandler(async (req, res) => {
   const { title, description, assignedTo, status, priority, dueDate } =
@@ -347,4 +348,93 @@ const myTasks = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tasks, "Tasks fetched successfully."));
 });
 
-export { createTask, getAllTasks, getTaskById, updateTask, deleteTask, myTasks };
+const uploadAttachment = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const task = await Task.findById(taskId);
+  if (!task) {
+    throw new ApiError(404, "Task not found.");
+  }
+
+  const workspace = await Workspace.findById(task.workspace).populate(
+    "members.user",
+    "fullName email avatar",
+  );
+
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+
+  const currentMember = workspace.members.find(
+    (m) => m.user._id.toString() === req.user._id.toString(),
+  );
+  if (!currentMember) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+  const canUpload =
+    ["owner", "admin"].includes(currentMember.role) ||
+    task.assignedTo?.toString() === req.user._id.toString();
+
+  if (!canUpload) {
+    throw new ApiError(403, "You are not allowed to upload attachments.");
+  }
+
+  if (!req.files || req.files.length === 0) {
+    throw new ApiError(400, "Please upload atleast one attachment.");
+  }
+
+  if (task.attachments.length + req.files.length > 10) {
+    throw new ApiError(400, "Maximum 10 attachments allowed.");
+  }
+
+  const uploadedAttachments = [];
+
+  for (const file of req.files) {
+    const uploadedFile = await uploadOnCloudinary(file.path);
+    if (!uploadedFile) {
+      throw new ApiError(500, "Failed to upload attachment.");
+    }
+    uploadedAttachments.push({
+      url: uploadedFile.secure_url,
+      publicId: uploadedFile.public_id,
+      fileName: file.originalname,
+      fileType: file.mimetype,
+      fileSize: file.size,
+    });
+  }
+
+  task.attachments.push(...uploadedAttachments);
+  await task.save();
+
+  await task.populate([
+    {
+      path: "workspace",
+      select: "name",
+    },
+    {
+      path: "project",
+      select: "name status",
+    },
+    {
+      path: "assignedTo",
+      select: "fullName email avatar",
+    },
+    {
+      path: "createdBy",
+      select: "fullName email avatar",
+    },
+  ]);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, task, "Attachment uploaded successfully."));
+});
+
+export {
+  createTask,
+  getAllTasks,
+  getTaskById,
+  updateTask,
+  deleteTask,
+  myTasks,
+  uploadAttachment,
+};
