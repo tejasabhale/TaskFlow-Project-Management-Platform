@@ -4,7 +4,10 @@ import { Workspace } from "../models/workspace.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 
 const createTask = asyncHandler(async (req, res) => {
   const { title, description, assignedTo, status, priority, dueDate } =
@@ -380,31 +383,37 @@ const uploadAttachment = asyncHandler(async (req, res) => {
   }
 
   if (!req.files || req.files.length === 0) {
-    throw new ApiError(400, "Please upload atleast one attachment.");
+    throw new ApiError(400, "Please upload at least one attachment.");
   }
 
   if (task.attachments.length + req.files.length > 10) {
     throw new ApiError(400, "Maximum 10 attachments allowed.");
   }
-
   const uploadedAttachments = [];
+  const uploadedPublicIds = [];
 
-  for (const file of req.files) {
-    const uploadedFile = await uploadOnCloudinary(file.path);
-    if (!uploadedFile) {
-      throw new ApiError(500, "Failed to upload attachment.");
+  try {
+    for (const file of req.files) {
+      const uploadedFile = await uploadOnCloudinary(file.path);
+
+      uploadedPublicIds.push(uploadedFile.public_id);
+
+      uploadedAttachments.push({
+        url: uploadedFile.secure_url,
+        publicId: uploadedFile.public_id,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        fileSize: file.size,
+      });
     }
-    uploadedAttachments.push({
-      url: uploadedFile.secure_url,
-      publicId: uploadedFile.public_id,
-      fileName: file.originalname,
-      fileType: file.mimetype,
-      fileSize: file.size,
-    });
-  }
 
-  task.attachments.push(...uploadedAttachments);
-  await task.save();
+    task.attachments.push(...uploadedAttachments);
+    await task.save();
+  } catch (error) {
+    await Promise.all(uploadedPublicIds.map((id) => deleteFromCloudinary(id)));
+
+    throw error;
+  }
 
   await task.populate([
     {
