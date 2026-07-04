@@ -6,6 +6,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 
 const OTP_EXPIRY = 5 * 60 * 1000;
 const OTP_COOLDOWN = 60 * 1000;
@@ -359,4 +363,70 @@ const resendOtp = asyncHandler(async (req, res) => {
     );
 });
 
-export { register, verifyOtp, login, logout, refreshAccessToken, resendOtp };
+const updateAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Please upload avatar.");
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(404, "User not found.");
+  }
+
+  const oldPublicId = user.avatar.publicId;
+
+  let uploadedFile;
+  let updatedUser;
+
+  try {
+    uploadedFile = await uploadOnCloudinary(req.file.path);
+    if (!uploadedFile) {
+      throw new ApiError(500, "Avatar upload failed.");
+    }
+
+    updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          avatar: {
+            url: uploadedFile.secure_url,
+            publicId: uploadedFile.public_id,
+          },
+        },
+      },
+      {
+        returnDocument: "after",
+      },
+    );
+    if (!updatedUser) {
+      throw new ApiError(500, "Failed to update avatar.");
+    }
+  } catch (error) {
+    if (uploadedFile?.public_id) {
+      await deleteFromCloudinary(uploadedFile.public_id);
+    }
+    throw error;
+  }
+
+  if (oldPublicId) {
+    try {
+      await deleteFromCloudinary(oldPublicId);
+    } catch (err) {
+      console.error("Failed to delete old avatar:", err);
+    }
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "Avatar updated successfully."));
+});
+
+export {
+  register,
+  verifyOtp,
+  login,
+  logout,
+  refreshAccessToken,
+  resendOtp,
+  updateAvatar,
+};

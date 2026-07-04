@@ -27,6 +27,7 @@ router.post(
 );
 router.delete(
   "/:taskId/attachments/:attachmentId",
+  verifyJWT,
   validateObjectId("taskId"),
   validateObjectId("attachmentId"),
   deleteAttachment,

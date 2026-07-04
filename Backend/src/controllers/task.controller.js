@@ -139,10 +139,12 @@ const getAllTasks = asyncHandler(async (req, res) => {
   }
 
   const tasks = await Task.find({ project: projectId })
-    .populate("project", "name status")
-    .populate("workspace", "name")
-    .populate("assignedTo", "fullName email avatar")
-    .populate("createdBy", "fullName email avatar")
+    .populate([
+      { path: "project", select: "name status" },
+      { path: "workspace", select: "name" },
+      { path: "assignedTo", select: "fullName email avatar" },
+      { path: "createdBy", select: "fullName email avatar" },
+    ])
     .sort({ createdAt: -1 });
   return res
     .status(200)
@@ -151,11 +153,13 @@ const getAllTasks = asyncHandler(async (req, res) => {
 
 const getTaskById = asyncHandler(async (req, res) => {
   const { taskId } = req.params;
-  const task = await Task.findById(taskId)
-    .populate("workspace", "name")
-    .populate("project", "name status")
-    .populate("assignedTo", "fullName email avatar")
-    .populate("createdBy", "fullName email avatar");
+  const task = await Task.findById(taskId).populate([
+    { path: "workspace", select: "name" },
+    { path: "project", select: "name status" },
+    { path: "assignedTo", select: "fullName email avatar" },
+    { path: "createdBy", select: "fullName email avatar" },
+  ]);
+
   if (!task) {
     throw new ApiError(404, "Task not found.");
   }
@@ -292,10 +296,12 @@ const updateTask = asyncHandler(async (req, res) => {
   await task.save();
 
   const updatedTask = await Task.findById(taskId)
-    .populate("project", "name")
-    .populate("workspace", "name")
-    .populate("createdBy", "fullName userName email avatar")
-    .populate("assignedTo", "fullName userName email avatar")
+    .populate([
+      { path: "project", select: "name" },
+      { path: "workspace", select: "name" },
+      { path: "createdBy", select: "fullName email avatar" },
+      { path: "assignedTo", select: "fullName email avatar" },
+    ])
     .lean();
 
   return res
@@ -341,9 +347,11 @@ const myTasks = asyncHandler(async (req, res) => {
   const tasks = await Task.find({
     assignedTo: req.user._id,
   })
-    .populate("workspace", "name")
-    .populate("project", "name status")
-    .populate("createdBy", "fullName email avatar")
+    .populate([
+      { path: "workspace", select: "name" },
+      { path: "project", select: "name status" },
+      { path: "createdBy", select: "fullName email avatar" },
+    ])
     .sort({ createdAt: -1 });
 
   return res
@@ -395,12 +403,16 @@ const uploadAttachment = asyncHandler(async (req, res) => {
   try {
     for (const file of req.files) {
       const uploadedFile = await uploadOnCloudinary(file.path);
+      if (!uploadedFile) {
+        throw new ApiError(500, "Error while uploading file.");
+      }
 
       uploadedPublicIds.push(uploadedFile.public_id);
 
       uploadedAttachments.push({
         url: uploadedFile.secure_url,
         publicId: uploadedFile.public_id,
+        resourceType: uploadedFile.resource_type,
         fileName: file.originalname,
         fileType: file.mimetype,
         fileSize: file.size,
@@ -440,9 +452,7 @@ const uploadAttachment = asyncHandler(async (req, res) => {
 
 const deleteAttachment = asyncHandler(async (req, res) => {
   const { taskId, attachmentId } = req.params;
-  const task = await Task.findById(taskId)
-    .populate("workspace", "name")
-    .populate("project", "name");
+  const task = await Task.findById(taskId).populate("workspace", "name");
   if (!task) {
     throw new ApiError(404, "Task not found.");
   }
@@ -461,36 +471,31 @@ const deleteAttachment = asyncHandler(async (req, res) => {
     task.assignedTo?.toString() === req.user._id.toString();
 
   if (!canDelete) {
-    throw new ApiError(403, "Access denied.");
+    throw new ApiError(403, "You are not allowed to delete attachments.");
   }
 
   const attachment = task.attachments.find(
-    (a) => a._id.toString() === attachmentId.toString(),
+    (a) => a._id.toString() === attachmentId,
   );
 
   if (!attachment) {
     throw new ApiError(404, "Attachment not found.");
   }
 
-  await deleteFromCloudinary(attachment.publicId);
+  await deleteFromCloudinary(attachment.publicId, attachment.resourceType);
 
   task.attachments.pull(attachmentId);
   await task.save();
-  await task
-    .populate("workspace", "name")
-    .populate("project", "name")
-    .populate("assignedTo", "fullName email avatar")
-    .populate("createdBy", "fullName email avatar");
+  await task.populate([
+    { path: "workspace", select: "name" },
+    { path: "project", select: "name" },
+    { path: "assignedTo", select: "fullName email avatar" },
+    { path: "createdBy", selecr: "fullName email avatar" },
+  ]);
 
   return res
     .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        task,
-        "Attachment deleted sucessfully.",
-      ),
-    );
+    .json(new ApiResponse(200, task, "Attachment deleted successfully."));
 });
 
 export {

@@ -23,8 +23,14 @@ const userSchema = new mongoose.Schema(
       maxlength: 100,
     },
     avatar: {
-      type: String,
-      default: "",
+      url: {
+        type: String,
+        default: "",
+      },
+      publicId: {
+        type: String,
+        default: "",
+      },
     },
     email: {
       type: String,
@@ -62,15 +68,13 @@ const userSchema = new mongoose.Schema(
     },
     refreshToken: {
       type: String,
-      select: false
-    }
+      select: false,
+    },
   },
   {
     timestamps: true,
   },
 );
-
-
 
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
@@ -96,16 +100,16 @@ userSchema.methods.generateAccessToken = function () {
   );
 };
 
-userSchema.methods.generateRefreshToken = function(){
+userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     {
-      _id: this._id
+      _id: this._id,
     },
     process.env.REFRESH_TOKEN_SECRET,
     {
-      expiresIn: process.env.REFRESH_TOKEN_EXPIRY
-    }
-  )
-}
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+    },
+  );
+};
 
 export const User = mongoose.model("User", userSchema);

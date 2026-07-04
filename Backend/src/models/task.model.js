@@ -62,6 +62,10 @@ const taskSchema = new Schema(
           type: String,
           required: true,
         },
+        resourceType: {
+          type: String,
+          required: true,
+        },
         fileName: String,
         fileType: String,
         fileSize: Number,

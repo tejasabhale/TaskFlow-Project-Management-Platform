@@ -48,9 +48,10 @@ const getWorkspaces = asyncHandler(async (req, res) => {
 
 const getWorkspaceById = asyncHandler(async (req, res) => {
   const { workspaceId } = req.params;
-  const workspace = await Workspace.findById(workspaceId)
-    .populate("owner", "fullName email")
-    .populate("members.user", "fullName email avatar");
+  const workspace = await Workspace.findById(workspaceId).populate([
+    { path: "owner", select: "fullName email" },
+    { path: "members.user", select: "fullName email avatar" },
+  ]);
 
   if (!workspace) {
     throw new ApiError(404, "Workspace not found");
