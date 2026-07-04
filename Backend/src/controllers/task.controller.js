@@ -438,6 +438,61 @@ const uploadAttachment = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, task, "Attachment uploaded successfully."));
 });
 
+const deleteAttachment = asyncHandler(async (req, res) => {
+  const { taskId, attachmentId } = req.params;
+  const task = await Task.findById(taskId)
+    .populate("workspace", "name")
+    .populate("project", "name");
+  if (!task) {
+    throw new ApiError(404, "Task not found.");
+  }
+  const workspace = await Workspace.findById(task.workspace._id);
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+  const currentMember = workspace.members.find(
+    (m) => m.user.toString() === req.user._id.toString(),
+  );
+  if (!currentMember) {
+    throw new ApiError(403, "Access denied.");
+  }
+  const canDelete =
+    ["admin", "owner"].includes(currentMember.role) ||
+    task.assignedTo?.toString() === req.user._id.toString();
+
+  if (!canDelete) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+  const attachment = task.attachments.find(
+    (a) => a._id.toString() === attachmentId.toString(),
+  );
+
+  if (!attachment) {
+    throw new ApiError(404, "Attachment not found.");
+  }
+
+  await deleteFromCloudinary(attachment.publicId);
+
+  task.attachments.pull(attachmentId);
+  await task.save();
+  await task
+    .populate("workspace", "name")
+    .populate("project", "name")
+    .populate("assignedTo", "fullName email avatar")
+    .populate("createdBy", "fullName email avatar");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        task,
+        "Attachment deleted sucessfully.",
+      ),
+    );
+});
+
 export {
   createTask,
   getAllTasks,
@@ -446,4 +501,5 @@ export {
   deleteTask,
   myTasks,
   uploadAttachment,
+  deleteAttachment,
 };
