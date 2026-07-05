@@ -421,6 +421,25 @@ const updateAvatar = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedUser, "Avatar updated successfully."));
 });
 
+const deleteAvatar = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(404, "User not found.");
+  }
+  if (!user.avatar.publicId) {
+    throw new ApiError(400, "No avatar to delete.");
+  }
+  await deleteFromCloudinary(user.avatar.publicId);
+  user.avatar = {
+    url: "",
+    publicId: "",
+  };
+  await user.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar deleted successfully."));
+});
+
 export {
   register,
   verifyOtp,
@@ -429,4 +448,5 @@ export {
   refreshAccessToken,
   resendOtp,
   updateAvatar,
+  deleteAvatar,
 };

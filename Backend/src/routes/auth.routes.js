@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  deleteAvatar,
   login,
   logout,
   refreshAccessToken,
@@ -20,4 +21,5 @@ router.post("/logout", verifyJWT, logout);
 router.post("/refresh-access-token", refreshAccessToken);
 router.post("/resend-otp", resendOtp);
 router.patch("/avatar", verifyJWT, upload.single("avatar"), updateAvatar);
+router.delete("/avatar", verifyJWT, deleteAvatar);
 export default router;

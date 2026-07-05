@@ -402,7 +402,7 @@ const uploadAttachment = asyncHandler(async (req, res) => {
 
   try {
     for (const file of req.files) {
-      const uploadedFile = await uploadOnCloudinary(file.path);
+      const uploadedFile = await uploadOnCloudinary(file.path, auto);
       if (!uploadedFile) {
         throw new ApiError(500, "Error while uploading file.");
       }
