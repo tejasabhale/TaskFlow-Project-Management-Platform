@@ -1,12 +1,10 @@
 import { Router } from "express";
 import {
-  deleteAvatar,
   login,
   logout,
   refreshAccessToken,
   register,
   resendOtp,
-  updateAvatar,
   verifyOtp,
 } from "../controllers/auth.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -20,6 +18,5 @@ router.post("/login", login);
 router.post("/logout", verifyJWT, logout);
 router.post("/refresh-access-token", refreshAccessToken);
 router.post("/resend-otp", resendOtp);
-router.patch("/avatar", verifyJWT, upload.single("avatar"), updateAvatar);
-router.delete("/avatar", verifyJWT, deleteAvatar);
+
 export default router;

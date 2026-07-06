@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import workspaceRouter from "./routes/workspace.routes.js";
 import projectRouter from "./routes/project.routes.js";
 import taskRouter from "./routes/task.routes.js";
+import profileRouter from "./routes/profile.routes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
@@ -16,6 +17,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/workspace", workspaceRouter);
 app.use("/api/v1/project", projectRouter);
 app.use("/api/v1/task", taskRouter);
+app.use("/api/v1/profile", profileRouter);
 
 app.use(errorHandler);
 

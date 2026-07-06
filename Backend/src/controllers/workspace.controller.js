@@ -71,11 +71,11 @@ const updateWorkspace = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
   const { workspaceId } = req.params;
   if (name !== undefined && !name.trim()) {
-    throw new ApiError(400, "Name is required");
+    throw new ApiError(400, "Name cannot be empty.");
   }
 
   if (description !== undefined && !description.trim()) {
-    throw new ApiError(400, "Description is required");
+    throw new ApiError(400, "Description cannot be empty.");
   }
 
   if (name) {
