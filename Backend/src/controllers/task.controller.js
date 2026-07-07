@@ -119,7 +119,19 @@ const createTask = asyncHandler(async (req, res) => {
 
 const getAllTasks = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
+
+  const {
+    status,
+    priority,
+    assignedTo,
+    search,
+    sortBy,
+    page = 1,
+    limit = 10,
+  } = req.query;
+
   const project = await Project.findById(projectId);
+
   if (!project) {
     throw new ApiError(404, "Project not found.");
   }
@@ -138,17 +150,81 @@ const getAllTasks = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Access denied.");
   }
 
-  const tasks = await Task.find({ project: projectId })
+  // Filters
+
+  const filter = {
+    project: projectId,
+  };
+
+  if (status) {
+    filter.status = status;
+  }
+
+  if (priority) {
+    filter.priority = priority;
+  }
+
+  if (assignedTo) {
+    filter.assignedTo = assignedTo;
+  }
+
+  if (search) {
+    filter.title = {
+      $regex: search,
+      $options: "i",
+    };
+  }
+
+  // sort
+
+  let sort = { createdAt: -1 };
+
+  if (sortBy === "dueDate") {
+    sort = { dueDate: 1 };
+  }
+
+  if (sortBy === "priority") {
+    sort = { priority: 1 };
+  }
+
+  if (sortBy === "title") {
+    sort = { title: 1 };
+  }
+
+  // Pagination
+
+  const pageNumber = Number(page);
+  const limitNumber = Number(limit);
+  const skip = (pageNumber - 1) * limitNumber;
+
+  const tasks = await Task.find(filter)
     .populate([
       { path: "project", select: "name status" },
       { path: "workspace", select: "name" },
       { path: "assignedTo", select: "fullName email avatar" },
       { path: "createdBy", select: "fullName email avatar" },
     ])
-    .sort({ createdAt: -1 });
+    .sort(sort)
+    .skip(skip)
+    .limit(limitNumber);
+
+  const totalTasks = await Task.countDocuments(filter);
+
   return res
     .status(200)
-    .json(new ApiResponse(200, tasks, "Tasks fetched successfully."));
+    .json(
+      new ApiResponse(
+        200,
+        {
+          tasks,
+          page: pageNumber,
+          limit: limitNumber,
+          totalTasks: totalTasks,
+          totalPages: Math.ceil(totalTasks / limitNumber),
+        },
+        "Tasks fetched successfully.",
+      ),
+    );
 });
 
 const getTaskById = asyncHandler(async (req, res) => {
@@ -498,6 +574,177 @@ const deleteAttachment = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, task, "Attachment deleted successfully."));
 });
 
+const updateTaskStatus = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    throw new ApiError(400, "Task status is required.");
+  }
+
+  const allowedStatuses = ["todo", "inProgress", "review", "completed"];
+
+  if (!allowedStatuses.includes(status)) {
+    throw new ApiError(400, "Invalid task status.");
+  }
+
+  const task = await Task.findById(taskId);
+
+  if (!task) {
+    throw new ApiError(404, "Task not found.");
+  }
+
+  const workspace = await Workspace.findById(task.workspace).populate(
+    "members.user",
+    "fullName email avatar",
+  );
+
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+
+  const currentMember = workspace.members.find(
+    (member) => member.user._id.toString() === req.user._id.toString(),
+  );
+
+  if (!currentMember) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+  const canUpdate =
+    ["owner", "admin"].includes(currentMember.role) ||
+    task.assignedTo?.toString() === req.user._id.toString();
+
+  if (!canUpdate) {
+    throw new ApiError(403, "You are not allowed to update the task status.");
+  }
+
+  if (task.status === status) {
+    throw new ApiError(400, "Task already has this status.");
+  }
+
+  task.status = status;
+
+  await task.save();
+
+  await task.populate([
+    {
+      path: "workspace",
+      select: "name",
+    },
+    {
+      path: "project",
+      select: "name status",
+    },
+    {
+      path: "assignedTo",
+      select: "fullName email avatar",
+    },
+    {
+      path: "createdBy",
+      select: "fullName email avatar",
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, task, "Task status updated successfully."));
+});
+
+const assignTask = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const { assignedTo } = req.body;
+
+  if (assignedTo === undefined) {
+    throw new ApiError(400, "assignedTo field is required.");
+  }
+
+  const task = await Task.findById(taskId);
+
+  if (!task) {
+    throw new ApiError(404, "Task not found.");
+  }
+
+  const workspace = await Workspace.findById(task.workspace).populate(
+    "members.user",
+    "fullName email avatar",
+  );
+
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+
+  const currentMember = workspace.members.find(
+    (member) => member.user._id.toString() === req.user._id.toString(),
+  );
+
+  if (!currentMember) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+  if (!["owner", "admin"].includes(currentMember.role)) {
+    throw new ApiError(403, "Only owners and admins can assign tasks.");
+  }
+
+  if (assignedTo === null) {
+    if (!task.assignedTo) {
+      throw new ApiError(400, "Task is already unassigned.");
+    }
+
+    task.assignedTo = null;
+  } else {
+    const assignedMember = workspace.members.find(
+      (member) => member.user._id.toString() === assignedTo.toString(),
+    );
+
+    if (!assignedMember) {
+      throw new ApiError(
+        400,
+        "Assigned user is not a member of this workspace.",
+      );
+    }
+
+    if (task.assignedTo?.toString() === assignedTo.toString()) {
+      throw new ApiError(400, "Task is already assigned to this user.");
+    }
+
+    task.assignedTo = assignedTo;
+  }
+
+  await task.save();
+
+  await task.populate([
+    {
+      path: "workspace",
+      select: "name",
+    },
+    {
+      path: "project",
+      select: "name status",
+    },
+    {
+      path: "assignedTo",
+      select: "fullName email avatar",
+    },
+    {
+      path: "createdBy",
+      select: "fullName email avatar",
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        task,
+        assignedTo === null
+          ? "Task unassigned successfully."
+          : "Task assigned successfully.",
+      ),
+    );
+});
+
 export {
   createTask,
   getAllTasks,
@@ -507,4 +754,6 @@ export {
   myTasks,
   uploadAttachment,
   deleteAttachment,
+  updateTaskStatus,
+  assignTask,
 };

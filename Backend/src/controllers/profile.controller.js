@@ -8,6 +8,13 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 
+const clearCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+  path: "/",
+};
+
 const updateAvatar = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw new ApiError(400, "Please upload avatar.");
@@ -193,7 +200,7 @@ const changePassword = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findById(req.user._id).select(
-    "+password +refreshToken",
+    "+password",
   );
 
   if (!user) {
@@ -222,6 +229,8 @@ const changePassword = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
+    .clearCookie("accessToken", clearCookieOptions)
+    .clearCookie("refreshToken", clearCookieOptions)
     .json(new ApiResponse(200, null, "Password updated successfully."));
 });
 
