@@ -8,6 +8,7 @@ import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
+import { createNotification } from "../utils/notification.js";
 
 const createTask = asyncHandler(async (req, res) => {
   const { title, description, assignedTo, status, priority, dueDate } =
@@ -112,6 +113,22 @@ const createTask = asyncHandler(async (req, res) => {
       select: "fullName email avatar",
     },
   ]);
+
+  if (
+    task.assignedTo &&
+    task.assignedTo._id.toString() !== req.user._id.toString()
+  ) {
+    await createNotification({
+      recipient: task.assignedTo._id,
+      sender: req.user._id,
+      title: "Task assigned.",
+      message: `A new task "${task.title}" has been assigned to you.`,
+      type: "TASK_ASSIGNED",
+      task: task._id,
+      workspace: workspace._id,
+    });
+  }
+
   return res
     .status(201)
     .json(new ApiResponse(201, task, "Task created successfully."));
@@ -210,21 +227,19 @@ const getAllTasks = asyncHandler(async (req, res) => {
 
   const totalTasks = await Task.countDocuments(filter);
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        {
-          tasks,
-          page: pageNumber,
-          limit: limitNumber,
-          totalTasks: totalTasks,
-          totalPages: Math.ceil(totalTasks / limitNumber),
-        },
-        "Tasks fetched successfully.",
-      ),
-    );
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        tasks,
+        page: pageNumber,
+        limit: limitNumber,
+        totalTasks: totalTasks,
+        totalPages: Math.ceil(totalTasks / limitNumber),
+      },
+      "Tasks fetched successfully.",
+    ),
+  );
 });
 
 const getTaskById = asyncHandler(async (req, res) => {
@@ -623,6 +638,8 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Task already has this status.");
   }
 
+  const previousStatus = task.status;
+
   task.status = status;
 
   await task.save();
@@ -645,6 +662,28 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
       select: "fullName email avatar",
     },
   ]);
+
+  await createNotification({
+    recipient: task.assignedTo,
+    sender: req.user._id,
+    title: "Task Updated",
+    message: `"${task.title}" has been updated.`,
+    type: "TASK_UPDATED",
+    task: task._id,
+  });
+
+  if (previousStatus !== "completed" && status === "completed") {
+    await createNotification({
+      recipient: task.createdBy,
+      sender: req.user._id,
+      title: "Task Completed",
+      message: `"${task.title}" has been completed.`,
+      type: "TASK_COMPLETED",
+      task: task._id,
+      project: task.project,
+      workspace: task.workspace,
+    });
+  }
 
   return res
     .status(200)
@@ -731,6 +770,17 @@ const assignTask = asyncHandler(async (req, res) => {
       select: "fullName email avatar",
     },
   ]);
+
+  await createNotification({
+    recipient: assignedTo,
+    sender: req.user._id,
+    title: "Task Assigned",
+    message: `You have been assigned "${task.title}".`,
+    type: "TASK_ASSIGNED",
+    task: task._id,
+    project: task.project,
+    workspace: task.workspace,
+  });
 
   return res
     .status(200)

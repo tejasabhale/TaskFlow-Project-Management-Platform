@@ -4,6 +4,7 @@ import { Workspace } from "../models/workspace.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { createNotification } from "../utils/notification.js";
 
 const createProject = asyncHandler(async (req, res) => {
   const { name, description, status, startDate, endDate } = req.body;
@@ -36,7 +37,7 @@ const createProject = asyncHandler(async (req, res) => {
   if (existedProject) {
     throw new ApiError(
       409,
-      "A project with this name is already exists in this workspace.",
+      "A project with this name already exists in this workspace.",
     );
   }
 
@@ -58,6 +59,22 @@ const createProject = asyncHandler(async (req, res) => {
     { path: "workspace", select: "name" },
     { path: "createdBy", select: "fullName email avatar" },
   ]);
+
+  await Promise.all(
+    workspace.members
+      .filter((member) => member.user.toString() !== req.user._id.toString())
+      .map((member) =>
+        createNotification({
+          recipient: member.user,
+          sender: req.user._id,
+          title: "New Project",
+          message: `${project.createdBy.fullName} created project "${project.name}".`,
+          type: "PROJECT_CREATED",
+          project: project._id,
+          workspace: workspace._id,
+        }),
+      ),
+  );
 
   return res
     .status(201)

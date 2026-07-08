@@ -213,6 +213,15 @@ const addWorkspaceMembers = asyncHandler(async (req, res) => {
 
   await workspace.populate("members.user", "fullName email avatar");
 
+  await createNotification({
+    recipient: user._id,
+    sender: req.user._id,
+    title: "Workspace Invitation",
+    message: `You were added to ${workspace.name}.`,
+    type: "WORKSPACE_INVITE",
+    workspace: workspace._id,
+});
+
   return res
     .status(201)
     .json(new ApiResponse(201, workspace, "Member added successfully."));

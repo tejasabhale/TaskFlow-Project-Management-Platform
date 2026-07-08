@@ -1,5 +1,6 @@
 import { Project } from "../models/project.model.js";
 import { Task } from "../models/task.model.js";
+import { Workspace } from "../models/workspace.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
