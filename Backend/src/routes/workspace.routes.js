@@ -14,7 +14,11 @@ import {
 } from "../controllers/workspace.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { validateObjectId } from "../middlewares/validateObjectId.middleware.js";
-import { createProject, getAllProjects } from "../controllers/project.controller.js";
+import {
+  createProject,
+  getAllProjects,
+} from "../controllers/project.controller.js";
+import { getWorkspaceActivities } from "../controllers/activity.controller.js";
 
 const router = Router();
 
@@ -85,13 +89,20 @@ router.delete(
   removeWorkspaceMember,
 );
 
+router.get(
+  "/:projectId/activities",
+  verifyJWT,
+  validateObjectId("projectId"),
+  getWorkspaceActivities,
+);
+
 // Project Routes
 
 router.get(
   "/:workspaceId/projects",
   verifyJWT,
   validateObjectId("workspaceId"),
-  getAllProjects
+  getAllProjects,
 );
 
 router.post(

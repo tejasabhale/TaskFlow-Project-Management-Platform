@@ -8,6 +8,7 @@ import {
   updateProject,
 } from "../controllers/project.controller.js";
 import { createTask, getAllTasks } from "../controllers/task.controller.js";
+import { getProjectActivities } from "../controllers/activity.controller.js";
 
 const router = Router();
 
@@ -37,6 +38,13 @@ router.get(
   verifyJWT,
   validateObjectId("projectId"),
   getProjectStats,
+);
+
+router.get(
+  "/:projectId/activities",
+  verifyJWT,
+  validateObjectId("projectId"),
+  getProjectActivities,
 );
 
 // Task Routes

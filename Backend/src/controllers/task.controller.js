@@ -8,6 +8,7 @@ import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
+import { createActivity } from "../utils/createActivity.js";
 import { createNotification } from "../utils/notification.js";
 
 const createTask = asyncHandler(async (req, res) => {
@@ -125,9 +126,16 @@ const createTask = asyncHandler(async (req, res) => {
       message: `A new task "${task.title}" has been assigned to you.`,
       type: "TASK_ASSIGNED",
       task: task._id,
-      workspace: workspace._id,
     });
   }
+
+  await createActivity({
+    user: req.user._id,
+    workspace: workspace._id,
+    project: project._id,
+    task: task._id,
+    action: `${req.user.fullName} created task "${task.title}".`,
+  });
 
   return res
     .status(201)
@@ -395,6 +403,23 @@ const updateTask = asyncHandler(async (req, res) => {
     ])
     .lean();
 
+  await createNotification({
+    recipient: updateTask.assignedTo._id,
+    sender: req.user._id,
+    title: "Task Updated",
+    message: `"${updateTask.title}" is updated by ${req.user.fullName}`,
+    type: "TASK_UPDATED",
+    task: task._id,
+  });
+
+  await createActivity({
+    user: req.user._id,
+    workspace: task.workspace,
+    project: task.project,
+    task: task._id,
+    action: `${req.user.fullName} updated the task.`,
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, updatedTask, "Task updated successfully."));
@@ -428,6 +453,21 @@ const deleteTask = asyncHandler(async (req, res) => {
   }
 
   await task.deleteOne();
+
+  await createNotification({
+    recipient: task.assignedTo,
+    sender: req.user._id,
+    title: "Task Deleted",
+    message: `Task "${task.title}" has been deleted.`,
+  });
+
+  await createActivity({
+    user: req.user._id,
+    workspace: task.workspace,
+    project: task.project,
+    task: task._id,
+    action: `${req.user.fullName} deleted the task.`,
+  });
 
   return res
     .status(200)
@@ -536,6 +576,24 @@ const uploadAttachment = asyncHandler(async (req, res) => {
       select: "fullName email avatar",
     },
   ]);
+
+  await createNotification({
+    recipient: task.assignedTo._id,
+    sender: req.user._id,
+    title: "Task Attachment",
+    message: `A new attachment was added to "${task.title}"`,
+    type: "TASK_ATTACHMENT_UPLOADED",
+    task: task,
+  });
+
+  await createActivity({
+    user: req.user._id,
+    workspace: task.workspace,
+    project: task.project,
+    task: task._id,
+    action: `${req.user.fullName} uploaded an attachment.`,
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, task, "Attachment uploaded successfully."));
@@ -583,6 +641,14 @@ const deleteAttachment = asyncHandler(async (req, res) => {
     { path: "assignedTo", select: "fullName email avatar" },
     { path: "createdBy", selecr: "fullName email avatar" },
   ]);
+
+  await createActivity({
+    user: req.user._id,
+    workspace: task.workspace,
+    project: task.project,
+    task: task._id,
+    action: `${req.user.fullName} deleted an attachment.`,
+  });
 
   return res
     .status(200)
@@ -685,6 +751,14 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     });
   }
 
+  await createActivity({
+    user: req.user._id,
+    workspace: task.workspace,
+    project: task.project,
+    task: task._id,
+    action: `${req.user.fullName} changed the task status to "${status}".`,
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, task, "Task status updated successfully."));
@@ -778,8 +852,14 @@ const assignTask = asyncHandler(async (req, res) => {
     message: `You have been assigned "${task.title}".`,
     type: "TASK_ASSIGNED",
     task: task._id,
-    project: task.project,
+  });
+
+  await createActivity({
+    user: req.user._id,
     workspace: task.workspace,
+    project: task.project,
+    task: task._id,
+    action: `${req.user.fullName} assigned the task.`,
   });
 
   return res

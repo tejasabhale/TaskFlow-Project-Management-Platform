@@ -4,6 +4,7 @@ import { Workspace } from "../models/workspace.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { createActivity } from "../utils/createActivity.js";
 import { createNotification } from "../utils/notification.js";
 
 const createProject = asyncHandler(async (req, res) => {
@@ -75,6 +76,13 @@ const createProject = asyncHandler(async (req, res) => {
         }),
       ),
   );
+
+  await createActivity({
+    user: req.user._id,
+    workspace: workspace._id,
+    project: project._id,
+    action: `${req.user.fullName} created project "${project.name}".`,
+  });
 
   return res
     .status(201)
@@ -208,6 +216,13 @@ const updateProject = asyncHandler(async (req, res) => {
     ])
     .lean();
 
+  await createActivity({
+    user: req.user._id,
+    workspace: workspace._id,
+    project: project._id,
+    action: `${req.user.fullName} updated project "${project.name}".`,
+  });
+
   return res
     .status(200)
     .json(
@@ -239,6 +254,13 @@ const deleteProject = asyncHandler(async (req, res) => {
 
   await Task.deleteMany({ project: projectId });
   await project.deleteOne();
+
+  await createActivity({
+    user: req.user._id,
+    workspace: workspace._id,
+    project: project._id,
+    action: `${req.user.fullName} deleted project "${project.name}".`,
+  });
 
   return res
     .status(200)

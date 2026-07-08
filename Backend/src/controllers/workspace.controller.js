@@ -4,6 +4,8 @@ import { Workspace } from "../models/workspace.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { createActivity } from "../utils/createActivity.js";
+import { createNotification } from "../utils/notification.js";
 
 const createWorkspace = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
@@ -29,6 +31,13 @@ const createWorkspace = asyncHandler(async (req, res) => {
       },
     ],
   });
+
+  await createActivity({
+    user: req.user._id,
+    workspace: workspace._id,
+    action: `${req.user.fullName} created the workspace "${workspace.name}".`,
+  });
+
   return res
     .status(201)
     .json(new ApiResponse(201, workspace, "Workspace created successfully."));
@@ -108,6 +117,12 @@ const updateWorkspace = asyncHandler(async (req, res) => {
   if (description) workspace.description = description.trim();
   await workspace.save();
 
+  await createActivity({
+    user: req.user._id,
+    workspace: workspace._id,
+    action: `${req.user.fullName} updated the workspace.`,
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, workspace, "Workspace updated successfully."));
@@ -124,6 +139,13 @@ const deleteWorkspace = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Only owner can delete workspace!");
   }
   await workspace.deleteOne();
+
+  await createActivity({
+    user: req.user._id,
+    workspace: workspace._id,
+    action: `${req.user.fullName} deleted the workspace.`,
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Workspace deleted successfully!"));
@@ -220,7 +242,13 @@ const addWorkspaceMembers = asyncHandler(async (req, res) => {
     message: `You were added to ${workspace.name}.`,
     type: "WORKSPACE_INVITE",
     workspace: workspace._id,
-});
+  });
+
+  await createActivity({
+    user: req.user._id,
+    workspace: workspace._id,
+    action: `${req.user.fullName} added ${addedUser.fullName} to the workspace.`,
+  });
 
   return res
     .status(201)
@@ -283,6 +311,15 @@ const removeWorkspaceMember = asyncHandler(async (req, res) => {
   if (!updatedWorkspace) {
     throw new ApiError(404, "Workspace not found.");
   }
+
+  await createNotification({
+    recipient: memberId,
+    sender: req.user._id,
+    title: "Member Removed",
+    message: `You have been removed from workspace "${workspace.name}"`,
+    type: "WORKSPACE_MEMBER_REMOVED",
+    workspace: workspace._id,
+  });
 
   return res
     .status(200)
