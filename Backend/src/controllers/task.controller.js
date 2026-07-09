@@ -8,7 +8,7 @@ import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
-import { createActivity } from "../utils/createActivity.js";
+import { createActivity } from "../utils/activity.js";
 import { createNotification } from "../utils/notification.js";
 
 const createTask = asyncHandler(async (req, res) => {

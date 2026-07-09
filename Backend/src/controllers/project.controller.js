@@ -4,7 +4,7 @@ import { Workspace } from "../models/workspace.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { createActivity } from "../utils/createActivity.js";
+import { createActivity } from "../utils/activity.js";
 import { createNotification } from "../utils/notification.js";
 
 const createProject = asyncHandler(async (req, res) => {

@@ -14,6 +14,7 @@ import {
 } from "../controllers/task.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { getTaskActivities } from "../controllers/activity.controller.js";
+import { addComment, getComments } from "../controllers/comment.controller.js";
 
 const router = Router();
 
@@ -57,6 +58,22 @@ router.get(
   verifyJWT,
   validateObjectId("taskId"),
   getTaskActivities,
+);
+
+// Comments
+
+router.post(
+  "/:taskId/comments",
+  verifyJWT,
+  validateObjectId("taskId"),
+  addComment,
+);
+
+router.get(
+  "/:taskId/comments",
+  verifyJWT,
+  validateObjectId("taskId"),
+  getComments,
 );
 
 export default router;
