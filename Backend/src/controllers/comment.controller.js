@@ -46,7 +46,9 @@ const addComment = asyncHandler(async (req, res) => {
     workspace: workspace._id,
     user: req.user._id,
     content: content.trim(),
-  }).populate("user", "fullName email avatar");
+  });
+
+  await comment.populate("user", "fullName email avatar");
 
   if (
     task.assignedTo &&
