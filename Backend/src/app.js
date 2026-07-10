@@ -9,6 +9,7 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import commentRouter from "./routes/comment.routes.js";
+import labelRouter from "./routes/label.routes.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/v1/profile", profileRouter);
 app.use("/api/v1/dashboard", dashboardRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/comments", commentRouter);
+app.use("/api/v1/labels", labelRouter);
 
 app.use(errorHandler);
 

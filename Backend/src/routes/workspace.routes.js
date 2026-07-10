@@ -1,8 +1,10 @@
 import { Router } from "express";
 import {
   addWorkspaceMembers,
+  createLabel,
   createWorkspace,
   deleteWorkspace,
+  getLabel,
   getWorkspaceById,
   getWorkspaceMembers,
   getWorkspaces,
@@ -110,6 +112,22 @@ router.post(
   verifyJWT,
   validateObjectId("workspaceId"),
   createProject,
+);
+
+// Label Routes
+
+router.post(
+  "/:workspaceId/labels",
+  verifyJWT,
+  validateObjectId("workspaceId"),
+  createLabel,
+);
+
+router.get(
+  "/:workspaceId/labels",
+  verifyJWT,
+  validateObjectId("workspaceId"),
+  getLabel,
 );
 
 export default router;

@@ -6,6 +6,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { createActivity } from "../utils/activity.js";
 import { createNotification } from "../utils/notification.js";
+import { Label } from "../models/label.model.js";
 
 const createWorkspace = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
@@ -473,6 +474,104 @@ const getWorkspaceStats = asyncHandler(async (req, res) => {
   );
 });
 
+// Label
+
+const createLabel = asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+
+  const { name, color } = req.body;
+
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+
+  const currentMember = workspace.members.find(
+    (m) => m.user.toString() === req.user._id.toString(),
+  );
+
+  if (!currentMember) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+  if (!["owner", "admin"].includes(currentMember.role)) {
+    throw new ApiError(403, "Only admins and owners can create labels.");
+  }
+
+  if (!name?.trim()) {
+    throw new ApiError(400, "Name is required.");
+  }
+
+  const existingLabel = await Label.findOne({
+    workspace: workspaceId,
+    name: name.trim(),
+  });
+
+  if (existingLabel) {
+    throw new ApiError(409, "Label already exists.");
+  }
+
+  const label = await Label.create({
+    name: name.trim(),
+    color: color?.trim(),
+    workspace: workspaceId,
+    createdBy: req.user._id,
+  });
+
+  await Promise.all(
+    workspace.members
+      .filter((m) => m.user.toString() !== req.user._id.toString())
+      .map((m) =>
+        createNotification({
+          recipient: m.user,
+          sender: req.user._id,
+          title: "New Label Created",
+          message: `${req.user.fullName} created the "${label.name}" label.`,
+          type: "LABEL_CREATED",
+          workspace: workspaceId,
+        }),
+      ),
+  );
+
+  await createActivity({
+    user: req.user._id,
+    workspace: workspaceId,
+    action: `${req.user.fullName} created the "${label.name}" label`,
+  });
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, label, "Label created successfully."));
+});
+
+const getLabel = asyncHandler(async (req, res) => {
+  const { workspaceId } = req.params;
+
+  const workspace = await Workspace.findById(workspaceId);
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+
+  const currentMember = workspace.members.find(
+    (m) => m.user.toString() === req.user._id.toString(),
+  );
+
+  if (!currentMember) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+  const labels = await Label.find({
+    workspace: workspaceId,
+  })
+    .sort({ name: 1 })
+    .select("name color createdBy createdAt");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, labels, "Labels fetched successfully."));
+});
+
 export {
   createWorkspace,
   getWorkspaces,
@@ -485,4 +584,6 @@ export {
   leaveWorkspace,
   updateMemberRole,
   getWorkspaceStats,
+  createLabel,
+  getLabel,
 };

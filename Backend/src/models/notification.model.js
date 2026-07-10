@@ -36,6 +36,7 @@ const notificationSchema = new Schema(
         "WORKSPACE_INVITE",
         "WORKSPACE_MEMBER_ADDED",
         "WORKSPACE MEMBER REMOVED",
+        "LABEL_CREATED",
       ],
       required: true,
     },

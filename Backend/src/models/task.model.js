@@ -52,6 +52,13 @@ const taskSchema = new Schema(
       required: true,
     },
 
+    labels: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Label",
+      },
+    ],
+
     attachments: [
       {
         url: {

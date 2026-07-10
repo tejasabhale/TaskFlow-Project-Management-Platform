@@ -34,7 +34,7 @@ router.delete(
 );
 
 router.get(
-  "/:projectId/getStats",
+  "/:projectId/stats",
   verifyJWT,
   validateObjectId("projectId"),
   getProjectStats,
