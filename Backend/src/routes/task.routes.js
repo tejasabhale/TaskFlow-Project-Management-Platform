@@ -2,6 +2,7 @@ import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { validateObjectId } from "../middlewares/validateObjectId.middleware.js";
 import {
+  assignLabels,
   assignTask,
   createTask,
   deleteAttachment,
@@ -74,6 +75,15 @@ router.get(
   verifyJWT,
   validateObjectId("taskId"),
   getComments,
+);
+
+// Labels
+
+router.patch(
+  "/:taskId/labels",
+  verifyJWT,
+  validateObjectId("taskId"),
+  assignLabels,
 );
 
 export default router;

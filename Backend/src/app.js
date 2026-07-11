@@ -13,10 +13,12 @@ import labelRouter from "./routes/label.routes.js";
 
 const app = express();
 
+// Global Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// API Routes
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/workspace", workspaceRouter);
 app.use("/api/v1/project", projectRouter);
@@ -27,6 +29,7 @@ app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/comments", commentRouter);
 app.use("/api/v1/labels", labelRouter);
 
+// Error Handler
 app.use(errorHandler);
 
 export { app };

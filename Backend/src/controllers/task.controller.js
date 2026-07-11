@@ -10,6 +10,8 @@ import {
 } from "../utils/cloudinary.js";
 import { createActivity } from "../utils/activity.js";
 import { createNotification } from "../utils/notification.js";
+import { Label } from "../models/label.model.js";
+import mongoose from "mongoose";
 
 const createTask = asyncHandler(async (req, res) => {
   const { title, description, assignedTo, status, priority, dueDate } =
@@ -113,6 +115,10 @@ const createTask = asyncHandler(async (req, res) => {
       path: "createdBy",
       select: "fullName email avatar",
     },
+    {
+      path: "labels",
+      select: "name color",
+    },
   ]);
 
   if (
@@ -153,6 +159,7 @@ const getAllTasks = asyncHandler(async (req, res) => {
     sortBy,
     page = 1,
     limit = 10,
+    label,
   } = req.query;
 
   const project = await Project.findById(projectId);
@@ -193,47 +200,70 @@ const getAllTasks = asyncHandler(async (req, res) => {
     filter.assignedTo = assignedTo;
   }
 
-  if (search) {
-    filter.title = {
-      $regex: search,
-      $options: "i",
-    };
+  if (search?.trim()) {
+    filter.$or = [
+      {
+        title: {
+          $regex: search?.trim(),
+          $options: "i",
+        },
+      },
+      {
+        description: {
+          $regex: search?.trim(),
+          $options: "i",
+        },
+      },
+    ];
   }
 
-  // sort
+  if (label?.trim()) {
+    if (mongoose.Types.ObjectId.isValid(label)) {
+      filter.labels = label;
+    } else {
+      const labelDoc = await Label.findOne({
+        workspace: workspace._id,
+        name: label.trim().toLowerCase(),
+      }).select("_id");
+      if (!labelDoc) {
+        throw new ApiError(404, "Label not found.");
+      }
 
-  let sort = { createdAt: -1 };
-
-  if (sortBy === "dueDate") {
-    sort = { dueDate: 1 };
+      filter.labels = labelDoc._id;
+    }
   }
 
-  if (sortBy === "priority") {
-    sort = { priority: 1 };
-  }
+  // Sorting
 
-  if (sortBy === "title") {
-    sort = { title: 1 };
-  }
+  const sortOptions = {
+    createdAt: { createdAt: -1 },
+    dueDate: { dueDate: 1 },
+    priority: { priority: 1 },
+    title: { title: 1 },
+  };
+
+  const sort = sortOptions[sortBy] || sortOptions.createdAt;
 
   // Pagination
 
-  const pageNumber = Number(page);
-  const limitNumber = Number(limit);
+  const pageNumber = Math.max(1, Number(page));
+  const limitNumber = Math.max(1, Number(limit));
   const skip = (pageNumber - 1) * limitNumber;
 
-  const tasks = await Task.find(filter)
-    .populate([
-      { path: "project", select: "name status" },
-      { path: "workspace", select: "name" },
-      { path: "assignedTo", select: "fullName email avatar" },
-      { path: "createdBy", select: "fullName email avatar" },
-    ])
-    .sort(sort)
-    .skip(skip)
-    .limit(limitNumber);
-
-  const totalTasks = await Task.countDocuments(filter);
+  const [tasks, totalTasks] = await Promise.all([
+    Task.find(filter)
+      .populate([
+        { path: "project", select: "name status" },
+        { path: "workspace", select: "name" },
+        { path: "assignedTo", select: "fullName email avatar" },
+        { path: "createdBy", select: "fullName email avatar" },
+        { path: "labels", select: "name color" },
+      ])
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNumber),
+    Task.countDocuments(filter),
+  ]);
 
   return res.status(200).json(
     new ApiResponse(
@@ -257,6 +287,7 @@ const getTaskById = asyncHandler(async (req, res) => {
     { path: "project", select: "name status" },
     { path: "assignedTo", select: "fullName email avatar" },
     { path: "createdBy", select: "fullName email avatar" },
+    { path: "labels", select: "name color" },
   ]);
 
   if (!task) {
@@ -875,6 +906,123 @@ const assignTask = asyncHandler(async (req, res) => {
     );
 });
 
+const assignLabels = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const { labels } = req.body;
+
+  const task = await Task.findById(taskId);
+
+  if (!task) {
+    throw new ApiError(404, "Task not found.");
+  }
+
+  const workspace = await Workspace.findById(task.workspace);
+
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
+
+  const currentMember = workspace.members.find(
+    (m) => m.user.toString() === req.user._id.toString(),
+  );
+
+  if (!currentMember) {
+    throw new ApiError(403, "Access denied");
+  }
+
+  if (
+    !["owner", "admin"].includes(currentMember.role) &&
+    !task.createdBy.equals(req.user._id) &&
+    (!task.assignedTo || !task.assignedTo.equals(req.user._id))
+  ) {
+    throw new ApiError(403, "Access denied.");
+  }
+
+  if (!Array.isArray(labels)) {
+    throw new ApiError(400, "Labels must be an array.");
+  }
+
+  const uniqueLabels = [...new Set(labels)];
+
+  const validLabels = await Label.find({
+    _id: { $in: uniqueLabels },
+    workspace: workspace._id,
+  });
+
+  if (validLabels.length !== uniqueLabels.length) {
+    throw new ApiError(400, "One or more labels are invalid.");
+  }
+
+  const oldLabels = [...task.labels];
+
+  const addedLabels = uniqueLabels.filter(
+    (id) => !oldLabels.some((old) => old.equals(id)),
+  );
+
+  const removedLabels = oldLabels.filter(
+    (id) => !uniqueLabels.some((label) => id.equals(label)),
+  );
+
+  const addedLabelDocs =
+    addedLabels.length > 0
+      ? await Label.find({ _id: { $in: addedLabels } }).select("name")
+      : [];
+
+  const removedLabelDocs =
+    removedLabels.length > 0
+      ? await Label.find({ _id: { $in: removedLabels } }).select("name")
+      : [];
+
+  task.labels = uniqueLabels;
+  await task.save();
+
+  const activities = [
+    ...addedLabelDocs.map((label) =>
+      createActivity({
+        user: req.user._id,
+        workspace: workspace._id,
+        task: task._id,
+        action: `${req.user.fullName} added "${label.name}" label.`,
+      }),
+    ),
+    ...removedLabelDocs.map((label) =>
+      createActivity({
+        user: req.user._id,
+        workspace: workspace._id,
+        task: task._id,
+        action: `${req.user.fullName} removed "${label.name}" label.`,
+      }),
+    ),
+  ];
+
+  await Promise.all(activities);
+
+  await task.populate("labels", "name color");
+
+  if (task.assignedTo && !task.assignedTo.equals(req.user._id)) {
+    await createNotification({
+      recipient: task.assignedTo,
+      sender: req.user._id,
+      title: "Task Updated",
+      message: `${req.user.fullName} updated labels on "${task.title}".`,
+      type: "TASK_UPDATED",
+      task: task._id,
+    });
+  }
+
+  if (addedLabels.length === 0 && removedLabels.length === 0) {
+    await task.populate("labels", "name color");
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, task, "Task labels are already up to date."));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, task, "Task labels updated successfully."));
+});
+
 export {
   createTask,
   getAllTasks,
@@ -886,4 +1034,5 @@ export {
   deleteAttachment,
   updateTaskStatus,
   assignTask,
+  assignLabels,
 };
