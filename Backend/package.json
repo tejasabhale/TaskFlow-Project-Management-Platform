@@ -21,8 +21,10 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.7.0",
     "multer": "^2.2.0",
+    "resend": "^6.17.2",
     "swagger-jsdoc": "^6.3.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

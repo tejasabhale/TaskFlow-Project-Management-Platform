@@ -10,6 +10,11 @@ import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
+import {
+  sendOtpEmail,
+  sendPasswordChangedEmail,
+  sendPasswordResetEmail,
+} from "../services/email.service.js";
 
 const OTP_EXPIRY = 5 * 60 * 1000;
 const OTP_COOLDOWN = 60 * 1000;
@@ -94,6 +99,9 @@ const register = asyncHandler(async (req, res) => {
   if (process.env.NODE_ENV !== "production") {
     console.log(`OTP for ${normalizedEmail} is ${otp}`);
   }
+
+  sendOtpEmail({ to: user.email, otp });
+
   await Otp.deleteMany({
     email: normalizedEmail,
     action: "registration",
@@ -363,4 +371,155 @@ const resendOtp = asyncHandler(async (req, res) => {
     );
 });
 
-export { register, verifyOtp, login, logout, refreshAccessToken, resendOtp };
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email?.trim()) {
+    throw new ApiError(400, "Email is required.");
+  }
+
+  const user = await User.findOne({
+    email: email.trim().toLowerCase(),
+  });
+
+  if (!user) {
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          null,
+          "If an account with that email exists, a password reset link has been sent.",
+        ),
+      );
+  }
+
+  if (user.passwordResetToken && user.passwordResetTokenExpiry > Date.now()) {
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          null,
+          "If an account with that email exists, a password reset link has been sent.",
+        ),
+      );
+  }
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  user.passwordResetToken = hashedToken;
+  user.passwordResetTokenExpiry =
+    Date.now() + Number(process.env.RESET_PASSWORD_TOKEN_EXPIRY);
+
+  await user.save({ validateBeforeSave: false });
+
+  const resetLink = new URL(
+    `/reset-password/${resetToken}`,
+    process.env.FRONTEND_URL,
+  ).toString();
+
+  try {
+    await sendPasswordResetEmail({ to: user.email, resetLink });
+  } catch (error) {
+    user.passwordResetToken = undefined;
+    user.passwordResetTokenExpiry = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    throw new ApiError(500, "Failed to send password reset email.");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        null,
+        "If an account with that email exists, a password reset link has been sent.",
+      ),
+    );
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  const { newPassword, confirmPassword } = req.body;
+
+  if (!token?.trim()) {
+    throw new ApiError(400, "Reset token is required.");
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetTokenExpiry: { $gt: Date.now() },
+  }).select("+password");
+
+  if (!user) {
+    throw new ApiError(400, "Invalid or expired reset token.");
+  }
+
+  if (!newPassword?.trim() || !confirmPassword?.trim()) {
+    throw new ApiError(400, "New Password and Confirm Password are required.");
+  }
+
+  if (newPassword !== confirmPassword) {
+    throw new ApiError(400, "Passwords do not match.");
+  }
+
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+
+  if (!passwordRegex.test(newPassword)) {
+    throw new ApiError(
+      400,
+      "Password must contain at least 8 characters, one uppercase letter, one lowercase letter, one number, and one special character.",
+    );
+  }
+
+  const isSamePassword = await user.isPasswordCorrect(newPassword);
+
+  if (isSamePassword) {
+    throw new ApiError(
+      400,
+      "New password must be different from the current password.",
+    );
+  }
+
+  user.password = newPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetTokenExpiry = undefined;
+  user.refreshToken = undefined;
+
+  await user.save();
+
+  try {
+    await sendPasswordChangedEmail({
+      to: user.email,
+    });
+  } catch (error) {
+    console.error("Failed to send password changed email:", error);
+  }
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", cookieOptions)
+    .clearCookie("refreshToken", cookieOptions)
+    .json(new ApiResponse(200, null, "Password reset successfully."));
+});
+
+export {
+  register,
+  verifyOtp,
+  login,
+  logout,
+  refreshAccessToken,
+  resendOtp,
+  forgotPassword,
+  resetPassword,
+};

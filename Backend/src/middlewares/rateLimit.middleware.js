@@ -19,3 +19,22 @@ export const loginRateLimiter = rateLimit({
 });
 
 export const authRateLimiter = rateLimit(commonOptions);
+
+export const forgotPasswordLimiter = rateLimit({
+  ...commonOptions,
+  max: 3,
+  message: {
+    success: false,
+    message:
+      "Too many password reset requests. Please try again after 15 minutes.",
+  },
+});
+
+export const resetPasswordLimiter = rateLimit({
+  ...commonOptions,
+  message: {
+    success: false,
+    message:
+      "Too many password reset attempts. Please try again after 15 minutes.",
+  },
+});
