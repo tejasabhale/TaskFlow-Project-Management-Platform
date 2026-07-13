@@ -11,20 +11,12 @@ import notificationRouter from "./routes/notification.routes.js";
 import commentRouter from "./routes/comment.routes.js";
 import labelRouter from "./routes/label.routes.js";
 
-import swaggerUi from "swagger-ui-express";
-import YAML from "yamljs";
-
 const app = express();
 
 // Global Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
-// Swagger
-const swaggerDocument = YAML.load("./src/docs/auth.yaml");
-
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // API Routes
 app.use("/api/v1/auth", authRouter);

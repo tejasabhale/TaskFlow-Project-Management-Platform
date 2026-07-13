@@ -1,53 +1,48 @@
-import { resend } from "../config/resend.js";
-import { ApiError } from "../utils/ApiError.js";
-
-import { passwordResetTemplate } from "../templates/passwordReset.template.js";
-import { passwordChangedTemplate } from "../templates/passwordChanged.template.js";
+import { transporter } from "../config/mail.js";
 import { otpTemplate } from "../templates/otp.template.js";
+import { passwordChangedTemplate } from "../templates/passwordChanged.template.js";
+import { passwordResetTemplate } from "../templates/passwordReset.template.js";
 
-const FROM = process.env.RESEND_FROM || "TaskFlow <onboarding@resend.dev>";
+const FROM = `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_USER}>`;
 
-export const sendPasswordResetEmail = async ({ to, resetLink }) => {
-  const { data, error } = await resend.emails.send({
-    from: FROM,
-    to,
-    subject: "Reset Your Password",
-    html: passwordResetTemplate(resetLink),
-  });
-
-  if (error) {
-    throw new ApiError(500, "Failed to send password reset email.");
+export const sendOtpEmail = async ({ to, otp }) => {
+  try {
+    await transporter.sendMail({
+      from: FROM,
+      to,
+      subject: "Verify Your TaskFlow Account",
+      html: otpTemplate(otp),
+    });
+  } catch (error) {
+    console.error("Failed to send OTP email:", error);
+    throw error;
   }
-
-  return data;
 };
 
 export const sendPasswordChangedEmail = async ({ to }) => {
-  const { data, error } = await resend.emails.send({
-    from: FROM,
-    to,
-    subject: "Password Changed Successfully",
-    html: passwordChangedTemplate(),
-  });
-
-  if (error) {
-    throw new ApiError(500, "Failed to send password changed email.");
+  try {
+    await transporter.sendMail({
+      from: FROM,
+      to,
+      subject: "Password Changed Successfully",
+      html: passwordChangedTemplate(),
+    });
+  } catch (error) {
+    console.error("Failed to send password changed email:", error);
+    throw error;
   }
-
-  return data;
 };
 
-export const sendOtpEmail = async ({ to, otp }) => {
-  const { data, error } = await resend.emails.send({
-    from: FROM,
-    to,
-    subject: "Verify Your Email",
-    html: otpTemplate(otp),
-  });
-
-  if (error) {
-    throw new ApiError(500, "Failed to send verification email.");
+export const sendPasswordResetEmail = async ({ to, resetLink }) => {
+  try {
+    await transporter.sendMail({
+      from: FROM,
+      to,
+      subject: "Reset Your TaskFlow Password",
+      html: passwordResetTemplate(resetLink),
+    });
+  } catch (error) {
+    console.error("Failed to send password reset email:", error);
+    throw error;
   }
-
-  return data;
 };
