@@ -12,6 +12,7 @@
     "dev": "nodemon src/index.js"
   },
   "dependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
     "@getbrevo/brevo": "^6.0.2",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.10.0",

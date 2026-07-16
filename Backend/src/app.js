@@ -10,10 +10,12 @@ import dashboardRouter from "./routes/dashboard.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import commentRouter from "./routes/comment.routes.js";
 import labelRouter from "./routes/label.routes.js";
+import cors from "cors";
 
 const app = express();
 
 // Global Middlewares
+app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

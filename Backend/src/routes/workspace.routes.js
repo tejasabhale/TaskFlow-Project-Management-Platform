@@ -92,7 +92,7 @@ router.delete(
 );
 
 router.get(
-  "/:projectId/activities",
+  "/:workspaceId/activities",
   verifyJWT,
   validateObjectId("projectId"),
   getWorkspaceActivities,
