@@ -1,28 +1,45 @@
-import React from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
+
+import Home from "../pages/landing/Home";
+
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
-import VerifyOtp from "../pages/auth/VerifyOtp";
-import ProtectedRoute from "./ProtectedRoute";
-import Dashboard from "../pages/dashboard/Dashboard";
-import NotFound from "../pages/error/NotFound";
+import VerifyOTP from "../pages/auth/VerifyOtp";
+import ForgotPassword from "../pages/auth/ForgotPassword";
 
-function AppRoutes() {
+import Dashboard from "../pages/dashboard/Dashboard";
+
+import GuestRoute from "./GuestRoute";
+import ProtectedRoute from "./ProtectedRoute";
+
+import MainLayout from "../components/layout/MainLayout";
+import DashboardLayout from "../layouts/DashboardLayout";
+
+export default function AppRoutes() {
   return (
     <Routes>
-      {/* Public Routes */}
-      <Route path="/" element={<Login />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/verify-otp" element={<VerifyOtp />} />
-      {/* Protected Routes */}
-      <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/profile" element={<Dashboard />} />
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<Home />} />
       </Route>
-      <Route path="*" element={<NotFound />} />
+
+      <Route element={<DashboardLayout />}>
+          <Route path="/dash" element={<Dashboard />} />
+        </Route>
+
+      <Route element={<GuestRoute />}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify-otp" element={<VerifyOTP />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Route>
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-
-export default AppRoutes;
