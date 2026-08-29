@@ -40,6 +40,11 @@ const resetPassword = async (data) => {
   return response.data;
 };
 
+const resendOTP = async (email) => {
+  const response = await api.post("/auth/resend-otp", email);
+  return response.data;
+};
+
 const authService = {
   register,
   login,
@@ -49,6 +54,7 @@ const authService = {
   verifyOTP,
   forgotPassword,
   resetPassword,
+  resendOTP,
 };
 
 export default authService;

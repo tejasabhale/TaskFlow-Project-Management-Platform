@@ -1,40 +1,277 @@
 export const passwordResetTemplate = (resetLink) => `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <meta name="color-scheme" content="light" />
+
+  <title>Reset Password - TaskFlow</title>
 </head>
 
-<body style="font-family: Arial, sans-serif; line-height:1.6">
+<body
+  style="
+    margin:0;
+    padding:0;
+    background-color:#F0FDF9;
+    font-family:Arial, Helvetica, sans-serif;
+    color:#17201B;
+  "
+>
 
-  <h2>Password Reset Request</h2>
-
-  <p>You requested to reset your password.</p>
-
-  <p>
-    Click the button below to reset it:
-  </p>
-
-  <a
-    href="${resetLink}"
-    style="
-      display:inline-block;
-      padding:12px 20px;
-      background:#2563eb;
-      color:white;
-      text-decoration:none;
-      border-radius:6px;
-    "
+  <table
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
+    style="background-color:#F0FDF9;"
   >
-    Reset Password
-  </a>
+    <tr>
+      <td align="center" style="padding:32px 16px;">
 
-  <p>This link expires in 10 minutes.</p>
+        <table
+          width="100%"
+          cellpadding="0"
+          cellspacing="0"
+          border="0"
+          style="
+            max-width:520px;
+            background-color:#FFFFFF;
+            border:1px solid #D1FAE5;
+            border-radius:16px;
+            overflow:hidden;
+          "
+        >
 
-  <p>If you didn't request this, you can safely ignore this email.</p>
+          <!-- Header -->
+          <tr>
+            <td
+              align="center"
+              style="padding:32px 24px 24px;"
+            >
+
+              <div
+                style="
+                  display:inline-block;
+                  margin-bottom:16px;
+                  padding:6px 12px;
+                  background-color:#ECFDF5;
+                  border:1px solid #A7F3D0;
+                  border-radius:20px;
+                  color:#047857;
+                  font-size:12px;
+                  font-weight:700;
+                  letter-spacing:0.5px;
+                "
+              >
+                TASKFLOW
+              </div>
+
+              <h1
+                style="
+                  margin:0;
+                  font-size:24px;
+                  line-height:32px;
+                  font-weight:700;
+                  color:#17201B;
+                "
+              >
+                Reset your password
+              </h1>
+
+              <p
+                style="
+                  margin:8px 0 0;
+                  font-size:14px;
+                  line-height:22px;
+                  color:#6B7280;
+                "
+              >
+                Let's help you get back into your account.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding:8px 32px 32px;">
+
+              <p
+                style="
+                  margin:0 0 24px;
+                  font-size:15px;
+                  line-height:24px;
+                  color:#4B5563;
+                  text-align:center;
+                "
+              >
+                We received a request to reset your TaskFlow password.
+                Click the button below to create a new password.
+              </p>
+
+              <!-- Button -->
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+              >
+                <tr>
+                  <td align="center">
+
+                    <a
+                      href="${resetLink}"
+                      style="
+                        display:inline-block;
+                        padding:13px 28px;
+                        background-color:#10B981;
+                        color:#FFFFFF;
+                        text-decoration:none;
+                        font-size:14px;
+                        font-weight:700;
+                        line-height:20px;
+                        border-radius:10px;
+                      "
+                    >
+                      Reset Password
+                    </a>
+
+                  </td>
+                </tr>
+              </table>
+
+              <p
+                style="
+                  margin:18px 0 0;
+                  text-align:center;
+                  font-size:12px;
+                  line-height:18px;
+                  color:#9CA3AF;
+                "
+              >
+                This link expires in 10 minutes.
+              </p>
+
+              <!-- Security Notice -->
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+                style="margin-top:24px;"
+              >
+                <tr>
+                  <td
+                    style="
+                      padding:16px;
+                      background-color:#F9FAFB;
+                      border-radius:10px;
+                    "
+                  >
+
+                    <p
+                      style="
+                        margin:0;
+                        font-size:13px;
+                        line-height:20px;
+                        color:#6B7280;
+                      "
+                    >
+                      <strong style="color:#374151;">
+                        Didn't request this?
+                      </strong>
+                      You can safely ignore this email.
+                      Your password will remain unchanged.
+                    </p>
+
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Fallback URL -->
+              <p
+                style="
+                  margin:24px 0 6px;
+                  font-size:11px;
+                  line-height:18px;
+                  color:#9CA3AF;
+                  text-align:center;
+                "
+              >
+                If the button doesn't work, copy and paste this link
+                into your browser:
+              </p>
+
+              <p
+                style="
+                  margin:0;
+                  font-size:11px;
+                  line-height:18px;
+                  text-align:center;
+                  word-break:break-all;
+                "
+              >
+                <a
+                  href="${resetLink}"
+                  style="
+                    color:#059669;
+                    text-decoration:none;
+                  "
+                >
+                  ${resetLink}
+                </a>
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td
+              align="center"
+              style="
+                padding:20px 24px;
+                background-color:#F9FAFB;
+                border-top:1px solid #E5E7EB;
+              "
+            >
+
+              <p
+                style="
+                  margin:0;
+                  font-size:11px;
+                  line-height:18px;
+                  color:#9CA3AF;
+                "
+              >
+                This is an automated email from TaskFlow.
+              </p>
+
+              <p
+                style="
+                  margin:4px 0 0;
+                  font-size:11px;
+                  line-height:18px;
+                  color:#D1D5DB;
+                "
+              >
+                © ${new Date().getFullYear()} TaskFlow
+              </p>
+
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
 
 </body>
-
 </html>
 `;

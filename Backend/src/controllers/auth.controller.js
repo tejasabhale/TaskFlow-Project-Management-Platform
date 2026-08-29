@@ -348,6 +348,9 @@ const resendOtp = asyncHandler(async (req, res) => {
   if (process.env.NODE_ENV !== "production") {
     console.log(`OTP for ${normalizedEmail} is ${otp}`);
   }
+
+  sendOtpEmail({ to: user.email, otp });
+
   await Otp.deleteMany({
     email: normalizedEmail,
     action: "registration",

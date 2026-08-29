@@ -26,7 +26,20 @@ export default function Login() {
 
   const onSubmit = async (data) => {
     try {
-      const response = await login(data);
+      const identifier = data.identifier.trim();
+
+      // Check whether the user entered an email or username
+      const isEmail = identifier.includes("@");
+
+      const loginData = {
+        userName: isEmail ? "" : identifier,
+        email: isEmail ? identifier : "",
+        password: data.password,
+      };
+
+      console.log("Login data:", loginData);
+
+      const response = await login(loginData);
 
       toast.success(response?.message || "Login successful!");
 
@@ -36,6 +49,8 @@ export default function Login() {
         replace: true,
       });
     } catch (error) {
+      console.error("Login error:", error);
+
       toast.error(
         error?.response?.data?.message || "Invalid username/email or password.",
       );
@@ -46,6 +61,7 @@ export default function Login() {
     <main className="min-h-screen flex items-center justify-center bg-[#ECFDF5] dark:bg-[#07130F] px-4 py-6 sm:px-6 lg:px-8">
       <section className="w-full max-w-md">
         <div className="bg-white dark:bg-[#10251D] p-5 sm:p-8 rounded-2xl shadow-lg border border-[#D1FAE5] dark:border-[#1B4332]">
+          {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-[#17201B] dark:text-[#ECFDF5] mb-2">
               Welcome Back
@@ -56,7 +72,9 @@ export default function Login() {
             </p>
           </div>
 
+          {/* Login Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Username / Email */}
             <Input
               id="identifier"
               label="Username or Email"
@@ -71,6 +89,7 @@ export default function Login() {
               }}
             />
 
+            {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label
@@ -100,6 +119,7 @@ export default function Login() {
               />
             </div>
 
+            {/* Login Button */}
             <Button
               type="submit"
               loading={isSubmitting}
@@ -109,6 +129,7 @@ export default function Login() {
             </Button>
           </form>
 
+          {/* Register */}
           <p className="text-center mt-6 text-sm sm:text-base text-gray-600 dark:text-[#A7C4B5]">
             Don't have an account?
             <Link

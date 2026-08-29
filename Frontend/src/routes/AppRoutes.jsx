@@ -14,6 +14,8 @@ import ProtectedRoute from "./ProtectedRoute";
 
 import MainLayout from "../components/layout/MainLayout";
 import DashboardLayout from "../layouts/DashboardLayout";
+import Projects from "../pages/dashboard/Projects";
+import Tasks from "../pages/dashboard/Tasks";
 
 export default function AppRoutes() {
   return (
@@ -21,10 +23,6 @@ export default function AppRoutes() {
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
       </Route>
-
-      <Route element={<DashboardLayout />}>
-          <Route path="/dash" element={<Dashboard />} />
-        </Route>
 
       <Route element={<GuestRoute />}>
         <Route path="/login" element={<Login />} />
@@ -34,8 +32,10 @@ export default function AppRoutes() {
       </Route>
 
       <Route element={<ProtectedRoute />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="projects" element={<Projects />} />
+          <Route path="tasks" element={<Tasks />} />
         </Route>
       </Route>
 
