@@ -20,7 +20,6 @@ import {
   createProject,
   getAllProjects,
 } from "../controllers/project.controller.js";
-import { getWorkspaceActivities } from "../controllers/activity.controller.js";
 
 const router = Router();
 
@@ -89,13 +88,6 @@ router.delete(
   verifyJWT,
   validateObjectId("workspaceId", "memberId"),
   removeWorkspaceMember,
-);
-
-router.get(
-  "/:workspaceId/activities",
-  verifyJWT,
-  validateObjectId("projectId"),
-  getWorkspaceActivities,
 );
 
 // Project Routes

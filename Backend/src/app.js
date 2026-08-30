@@ -10,6 +10,7 @@ import dashboardRouter from "./routes/dashboard.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import commentRouter from "./routes/comment.routes.js";
 import labelRouter from "./routes/label.routes.js";
+import activitiesRouter from "./routes/activities.routes.js";
 import cors from "cors";
 
 const app = express();
@@ -30,6 +31,7 @@ app.use("/api/v1/dashboard", dashboardRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/comments", commentRouter);
 app.use("/api/v1/labels", labelRouter);
+app.use("/api/v1/activities", activitiesRouter);
 
 // Error Handler
 app.use(errorHandler);
