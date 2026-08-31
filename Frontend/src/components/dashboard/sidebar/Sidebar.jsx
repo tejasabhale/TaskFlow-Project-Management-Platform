@@ -16,10 +16,11 @@ import {
 } from "react-icons/fi";
 
 import SidebarItem from "./SidebarItem";
-import authService from "../../../services/auth.service";
+import useAuth from "../../../hooks/useAuth";
 
 const Sidebar = () => {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -72,7 +73,7 @@ const Sidebar = () => {
     setIsWorkspaceOpen(false);
 
     // Later:
-    // setActiveWorkspace in WorkspaceContext
+    // Update active workspace in WorkspaceContext
     // and persist workspace selection.
   };
 
@@ -83,21 +84,29 @@ const Sidebar = () => {
     try {
       setLoggingOut(true);
 
-      await authService.logout();
-
-      navigate("/login", {
-        replace: true,
-      });
+      // AuthProvider handles clearing the user state.
+      // ProtectedRoute will redirect to /login automatically.
+      await logout();
     } catch (error) {
       console.error("Logout failed:", error);
-
-      navigate("/login", {
-        replace: true,
-      });
     } finally {
       setLoggingOut(false);
     }
   };
+
+  // User information
+  const fullName = user?.fullName || user?.userName || user?.name || "User";
+
+  const email = user?.email || "";
+
+  const initials =
+    fullName
+      .split(" ")
+      .filter(Boolean)
+      .map((name) => name[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
@@ -280,15 +289,15 @@ const Sidebar = () => {
           className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition hover:bg-gray-50"
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-900 text-sm font-medium text-white">
-            TA
+            {initials}
           </div>
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-gray-900">
-              Tejas Abhale
+              {fullName}
             </p>
 
-            <p className="truncate text-xs text-gray-500">tejas@example.com</p>
+            <p className="truncate text-xs text-gray-500">{email}</p>
           </div>
         </button>
 

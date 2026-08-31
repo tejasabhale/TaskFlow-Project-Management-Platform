@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { FiMenu, FiMoon, FiSun, FiX } from "react-icons/fi";
 
-import useTheme from "../../hooks/useTheme";
 import { BRAND } from "../../constants/brand";
+import useAuth from "../../hooks/useAuth";
+import useTheme from "../../hooks/useTheme";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isDarkMode, toggleTheme } = useTheme();
+  const { user, isAuthenticated } = useAuth();
 
   const closeMenu = () => {
     setIsMenuOpen(false);
@@ -17,6 +19,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-[#D1FAE5] bg-white/95 backdrop-blur-md dark:border-[#1B4332] dark:bg-[#07130F]/95">
       <nav className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
+          {/* Logo */}
           <Link
             to="/"
             onClick={closeMenu}
@@ -34,6 +37,7 @@ export default function Navbar() {
             </span>
           </Link>
 
+          {/* Navigation */}
           <div className="hidden items-center gap-7 md:flex">
             <a
               href="/#features"
@@ -50,6 +54,7 @@ export default function Navbar() {
             </a>
           </div>
 
+          {/* Desktop Actions */}
           <div className="hidden items-center gap-3 md:flex">
             <button
               type="button"
@@ -65,21 +70,33 @@ export default function Navbar() {
               {isDarkMode ? <FiSun size={19} /> : <FiMoon size={19} />}
             </button>
 
-            <Link
-              to="/login"
-              className="text-sm font-medium text-[#17201B] transition-colors hover:text-[#10B981] dark:text-[#ECFDF5] dark:hover:text-[#34D399]"
-            >
-              Login
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                to="/dashboard"
+                className="rounded-lg bg-[#10B981] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#059669] dark:bg-[#34D399] dark:text-[#07130F] dark:hover:bg-[#6EE7B7]"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm font-medium text-[#17201B] transition-colors hover:text-[#10B981] dark:text-[#ECFDF5] dark:hover:text-[#34D399]"
+                >
+                  Login
+                </Link>
 
-            <Link
-              to="/register"
-              className="rounded-lg bg-[#10B981] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#059669] dark:bg-[#34D399] dark:text-[#07130F] dark:hover:bg-[#6EE7B7]"
-            >
-              Get Started
-            </Link>
+                <Link
+                  to="/register"
+                  className="rounded-lg bg-[#10B981] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#059669] dark:bg-[#34D399] dark:text-[#07130F] dark:hover:bg-[#6EE7B7]"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
 
+          {/* Mobile Actions */}
           <div className="flex items-center gap-2 md:hidden">
             <button
               type="button"
@@ -107,6 +124,7 @@ export default function Navbar() {
           </div>
         </div>
 
+        {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="border-t border-[#D1FAE5] py-4 dark:border-[#1B4332] md:hidden">
             <div className="flex flex-col gap-1">
@@ -126,21 +144,33 @@ export default function Navbar() {
                 How It Works
               </a>
 
-              <Link
-                to="/login"
-                onClick={closeMenu}
-                className="rounded-lg px-3 py-2.5 text-sm font-medium text-[#17201B] hover:bg-[#ECFDF5] dark:text-[#ECFDF5] dark:hover:bg-[#10251D]"
-              >
-                Login
-              </Link>
+              {isAuthenticated ? (
+                <Link
+                  to="/dashboard"
+                  onClick={closeMenu}
+                  className="mt-2 rounded-lg bg-[#10B981] px-4 py-2.5 text-center text-sm font-semibold text-white dark:bg-[#34D399] dark:text-[#07130F]"
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    onClick={closeMenu}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-[#17201B] hover:bg-[#ECFDF5] dark:text-[#ECFDF5] dark:hover:bg-[#10251D]"
+                  >
+                    Login
+                  </Link>
 
-              <Link
-                to="/register"
-                onClick={closeMenu}
-                className="mt-2 rounded-lg bg-[#10B981] px-4 py-2.5 text-center text-sm font-semibold text-white dark:bg-[#34D399] dark:text-[#07130F]"
-              >
-                Get Started
-              </Link>
+                  <Link
+                    to="/register"
+                    onClick={closeMenu}
+                    className="mt-2 rounded-lg bg-[#10B981] px-4 py-2.5 text-center text-sm font-semibold text-white dark:bg-[#34D399] dark:text-[#07130F]"
+                  >
+                    Get Started
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
