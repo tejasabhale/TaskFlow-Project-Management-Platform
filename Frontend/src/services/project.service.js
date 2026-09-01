@@ -35,6 +35,11 @@ const getAllTasks = async (projectId, page = 1, limit = 20) => {
   return response.data;
 };
 
+const getMyProjects = async()=>{
+  const response = await api.get("/projects/me");
+  return response.data;
+}
+
 export {
   getProjectById,
   updateProject,
@@ -42,4 +47,5 @@ export {
   getProjectStats,
   createTask,
   getAllTasks,
+  getMyProjects
 };

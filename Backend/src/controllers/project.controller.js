@@ -318,6 +318,44 @@ const getProjectStats = asyncHandler(async (req, res) => {
   );
 });
 
+const getMyProjects = asyncHandler(async (req, res) => {
+  const workspaces = await Workspace.find({
+    "members.user": req.user._id,
+  })
+    .select("_id name")
+    .lean();
+
+  if (!workspaces.length) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, [], "No workspaces found for the user."));
+  }
+
+  const workspaceIds = workspaces.map((workspace) => workspace._id);
+
+  const projects = await Project.find({
+    workspace: { $in: workspaceIds },
+  })
+    .populate([
+      {
+        path: "workspace",
+        select: "name",
+      },
+      {
+        path: "createdBy",
+        select: "fullName email avatar",
+      },
+    ])
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, projects, "User projects fetched successfully."),
+    );
+});
+
 export {
   createProject,
   getAllProjects,
@@ -325,4 +363,5 @@ export {
   updateProject,
   deleteProject,
   getProjectStats,
+  getMyProjects,
 };

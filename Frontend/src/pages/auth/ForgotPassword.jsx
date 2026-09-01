@@ -3,9 +3,9 @@ import { Mail } from "lucide-react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
-import authService from "../../services/auth.service";
 import Input from "../../components/common/Input";
 import Button from "../../components/common/Button";
+import { forgotPassword } from "../../services/auth.service";
 
 export default function ForgotPassword() {
   const {
@@ -20,7 +20,7 @@ export default function ForgotPassword() {
 
   const onSubmit = async (data) => {
     try {
-      const response = await authService.forgotPassword(data);
+      const response = await forgotPassword(data);
 
       toast.success(
         response?.message ||

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AuthContext from "../context/AuthContext";
-import authService from "../services/auth.service";
+import { getCurrentUser, login, logout } from "../services/auth.service";
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -11,10 +11,9 @@ export default function AuthProvider({ children }) {
 
   const loadUser = useCallback(async () => {
     try {
-      const response = await authService.getCurrentUser();
+      const response = await getCurrentUser();
 
-      const currentUser =
-        response?.data?.user ?? response?.user ?? response?.data ?? null;
+      const currentUser = response?.data ?? null;
 
       setUser(currentUser);
     } catch (error) {
@@ -28,11 +27,11 @@ export default function AuthProvider({ children }) {
     loadUser();
   }, [loadUser]);
 
-  const login = useCallback(
+  const handleLogin = useCallback(
     async (credentials) => {
-      const response = await authService.login(credentials);
+      const response = await login(credentials);
 
-      const currentUser = response?.data?.user ?? response?.user ?? null;
+      const currentUser = response?.data?.user ?? null;
 
       if (currentUser) {
         setUser(currentUser);
@@ -45,13 +44,11 @@ export default function AuthProvider({ children }) {
     [loadUser],
   );
 
-  const logout = useCallback(async () => {
-    // Clear UI state FIRST.
-    // Don't wait for the API request.
+  const handleLogout = useCallback(async () => {
     setUser(null);
 
     try {
-      await authService.logout();
+      await logout();
     } catch (error) {
       console.error("Logout failed:", error);
     }
@@ -62,11 +59,13 @@ export default function AuthProvider({ children }) {
       user,
       isAuthenticated,
       isLoading,
-      login,
-      logout,
+
+      login: handleLogin,
+      logout: handleLogout,
+
       loadUser,
     }),
-    [user, isAuthenticated, isLoading, login, logout, loadUser],
+    [user, isAuthenticated, isLoading, handleLogin, handleLogout, loadUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

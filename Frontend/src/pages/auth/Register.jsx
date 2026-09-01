@@ -2,8 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Mail, User, Phone, AtSign } from "lucide-react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
-
-import authService from "../../services/auth.service";
+import { register } from "../../services/auth.service";
 import Input from "../../components/common/Input";
 import PasswordInput from "../../components/common/PasswordInput";
 import Button from "../../components/common/Button";
@@ -31,7 +30,7 @@ export default function Register() {
 
   const onSubmit = async (data) => {
     try {
-      const response = await authService.register({
+      const response = await register({
         userName: data.userName,
         fullName: data.fullName,
         mobileNo: data.mobileNo,

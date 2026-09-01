@@ -3,9 +3,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
-import authService from "../../services/auth.service";
 import useAuth from "../../hooks/useAuth";
 import Button from "../../components/common/Button";
+import { resendOTP, verifyOTP } from "../../services/auth.service";
 
 const OTP_LENGTH = 6;
 const RESEND_DELAY = 60;
@@ -120,7 +120,7 @@ export default function VerifyOtp() {
     }
 
     try {
-      const response = await authService.verifyOTP({
+      const response = await verifyOTP({
         email,
         otp: otpValue,
       });
@@ -143,7 +143,7 @@ export default function VerifyOtp() {
     }
 
     try {
-      const response = await authService.resendOTP({
+      const response = await resendOTP({
         email,
       });
 

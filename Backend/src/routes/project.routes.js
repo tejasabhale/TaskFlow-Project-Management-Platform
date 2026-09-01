@@ -3,6 +3,7 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { validateObjectId } from "../middlewares/validateObjectId.middleware.js";
 import {
   deleteProject,
+  getMyProjects,
   getProjectById,
   getProjectStats,
   updateProject,
@@ -10,6 +11,12 @@ import {
 import { createTask, getAllTasks } from "../controllers/task.controller.js";
 
 const router = Router();
+
+router.get(
+  "/me",
+  verifyJWT,
+  getMyProjects,
+);
 
 router.get(
   "/:projectId",

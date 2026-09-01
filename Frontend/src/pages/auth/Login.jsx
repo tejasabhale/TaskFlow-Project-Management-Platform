@@ -28,7 +28,6 @@ export default function Login() {
     try {
       const identifier = data.identifier.trim();
 
-      // Check whether the user entered an email or username
       const isEmail = identifier.includes("@");
 
       const loginData = {
@@ -37,7 +36,6 @@ export default function Login() {
         password: data.password,
       };
 
-      console.log("Login data:", loginData);
 
       const response = await login(loginData);
 

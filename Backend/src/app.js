@@ -23,9 +23,9 @@ app.use(cookieParser());
 
 // API Routes
 app.use("/api/v1/auth", authRouter);
-app.use("/api/v1/workspace", workspaceRouter);
-app.use("/api/v1/project", projectRouter);
-app.use("/api/v1/task", taskRouter);
+app.use("/api/v1/workspaces", workspaceRouter);
+app.use("/api/v1/projects", projectRouter);
+app.use("/api/v1/tasks", taskRouter);
 app.use("/api/v1/profile", profileRouter);
 app.use("/api/v1/dashboard", dashboardRouter);
 app.use("/api/v1/notifications", notificationRouter);
