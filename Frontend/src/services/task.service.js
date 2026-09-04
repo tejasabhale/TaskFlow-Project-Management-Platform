@@ -5,9 +5,12 @@ export const createTask = async (projectId, taskData) => {
   return response.data;
 };
 
-export const getAllTasks = async (projectId, params = {}) => {
+export const getAllTasks = async (projectId, page = 1, limit = 20) => {
   const response = await api.get(`/projects/${projectId}/tasks`, {
-    params,
+    params: {
+      page,
+      limit,
+    },
   });
   return response.data;
 };

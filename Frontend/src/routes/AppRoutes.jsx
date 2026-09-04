@@ -22,6 +22,7 @@ import Notifications from "../pages/notifications/Notifications";
 import Settings from "../pages/settings/Settings";
 import ProjectDetails from "../pages/projects/ProjectDetails";
 import TaskDetails from "../pages/tasks/TaskDetails";
+import { WorkspaceProvider } from "../providers/WorkspaceProvider";
 
 export default function AppRoutes() {
   return (
@@ -38,7 +39,13 @@ export default function AppRoutes() {
       </Route>
 
       <Route element={<ProtectedRoute />}>
-        <Route element={<DashboardLayout />}>
+        <Route
+          element={
+            <WorkspaceProvider>
+              <DashboardLayout />
+            </WorkspaceProvider>
+          }
+        >
           <Route path="/dashboard" element={<Dashboard />} />
 
           <Route path="/projects" element={<Projects />} />

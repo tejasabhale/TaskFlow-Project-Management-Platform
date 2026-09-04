@@ -17,40 +17,24 @@ import {
 
 import SidebarItem from "./SidebarItem";
 import useAuth from "../../../hooks/useAuth";
+import { useWorkspace } from "../../../hooks/useWorkspace";
+import { BRAND } from "../../../constants/brand";
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  const {
+    workspaces,
+    activeWorkspace,
+    changeWorkspace,
+    loading: workspaceLoading,
+  } = useWorkspace();
+
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const dropdownRef = useRef(null);
-
-  // Temporary workspace data
-  // Replace this with your workspace API later.
-  const workspaces = [
-    {
-      id: "1",
-      name: "My Workspace",
-      description: "Personal workspace",
-      initials: "MW",
-    },
-    {
-      id: "2",
-      name: "Devkraft",
-      description: "Team workspace",
-      initials: "DK",
-    },
-    {
-      id: "3",
-      name: "College Projects",
-      description: "Team workspace",
-      initials: "CP",
-    },
-  ];
-
-  const [activeWorkspace, setActiveWorkspace] = useState(workspaces[0]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -69,12 +53,13 @@ const Sidebar = () => {
 
   // Select workspace
   const handleWorkspaceSelect = (workspace) => {
-    setActiveWorkspace(workspace);
+    changeWorkspace(workspace);
     setIsWorkspaceOpen(false);
+  };
 
-    // Later:
-    // Update active workspace in WorkspaceContext
-    // and persist workspace selection.
+  // New task
+  const handleNewTask = () => {
+    navigate("/tasks/new");
   };
 
   // Logout
@@ -84,8 +69,6 @@ const Sidebar = () => {
     try {
       setLoggingOut(true);
 
-      // AuthProvider handles clearing the user state.
-      // ProtectedRoute will redirect to /login automatically.
       await logout();
     } catch (error) {
       console.error("Logout failed:", error);
@@ -108,6 +91,21 @@ const Sidebar = () => {
       .slice(0, 2)
       .toUpperCase() || "U";
 
+  // Workspace initials
+  const getWorkspaceInitials = (name) => {
+    if (!name) return "W";
+
+    return (
+      name
+        .split(" ")
+        .filter(Boolean)
+        .map((word) => word[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "W"
+    );
+  };
+
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
       {/* ==================== LOGO ==================== */}
@@ -116,9 +114,11 @@ const Sidebar = () => {
           to="/dashboard"
           className="flex items-center gap-2.5 rounded-lg outline-none focus:ring-2 focus:ring-gray-300"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black text-sm font-bold text-white">
-            T
-          </div>
+          <img
+            src={BRAND.logo}
+            alt={`${BRAND.name} logo`}
+            className="block h-9 w-9 shrink-0 object-contain sm:h-10 sm:w-10"
+          />
 
           <span className="text-lg font-semibold tracking-tight text-gray-900">
             TaskFlow
@@ -131,20 +131,31 @@ const Sidebar = () => {
         <button
           type="button"
           onClick={() => setIsWorkspaceOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition hover:bg-gray-50"
+          disabled={workspaceLoading || !activeWorkspace}
+          className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition hover:bg-gray-50 disabled:cursor-not-allowed"
         >
           <div className="flex min-w-0 items-center gap-3">
+            {/* Workspace Avatar */}
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gray-100 text-xs font-semibold text-gray-700">
-              {activeWorkspace.initials}
+              {workspaceLoading
+                ? "..."
+                : getWorkspaceInitials(activeWorkspace?.name)}
             </div>
 
+            {/* Workspace Details */}
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-gray-900">
-                {activeWorkspace.name}
+                {workspaceLoading
+                  ? "Loading..."
+                  : activeWorkspace?.name || "No workspace"}
               </p>
 
               <p className="truncate text-xs text-gray-500">
-                {activeWorkspace.description}
+                {workspaceLoading
+                  ? "Please wait"
+                  : activeWorkspace
+                    ? "Workspace"
+                    : "Create a workspace"}
               </p>
             </div>
           </div>
@@ -158,7 +169,7 @@ const Sidebar = () => {
         </button>
 
         {/* ==================== DROPDOWN ==================== */}
-        {isWorkspaceOpen && (
+        {isWorkspaceOpen && !workspaceLoading && (
           <div className="absolute left-3 right-3 top-full z-50 mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
             {/* Header */}
             <div className="border-b border-gray-100 px-3 py-2.5">
@@ -169,47 +180,53 @@ const Sidebar = () => {
 
             {/* Workspace List */}
             <div className="max-h-64 overflow-y-auto p-1.5">
-              {workspaces.map((workspace) => {
-                const isActive = activeWorkspace.id === workspace.id;
+              {workspaces.length === 0 ? (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-xs text-gray-500">No workspaces found.</p>
+                </div>
+              ) : (
+                workspaces.map((workspace) => {
+                  const isActive = activeWorkspace?._id === workspace._id;
 
-                return (
-                  <button
-                    key={workspace.id}
-                    type="button"
-                    onClick={() => handleWorkspaceSelect(workspace)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition ${
-                      isActive ? "bg-gray-100" : "hover:bg-gray-50"
-                    }`}
-                  >
-                    {/* Workspace Avatar */}
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold ${
-                        isActive
-                          ? "bg-black text-white"
-                          : "bg-gray-100 text-gray-700"
+                  return (
+                    <button
+                      key={workspace._id}
+                      type="button"
+                      onClick={() => handleWorkspaceSelect(workspace)}
+                      className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition ${
+                        isActive ? "bg-gray-100" : "hover:bg-gray-50"
                       }`}
                     >
-                      {workspace.initials}
-                    </div>
+                      {/* Workspace Avatar */}
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold ${
+                          isActive
+                            ? "bg-black text-white"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {getWorkspaceInitials(workspace.name)}
+                      </div>
 
-                    {/* Workspace Details */}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-900">
-                        {workspace.name}
-                      </p>
+                      {/* Workspace Details */}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-900">
+                          {workspace.name}
+                        </p>
 
-                      <p className="truncate text-xs text-gray-500">
-                        {workspace.description}
-                      </p>
-                    </div>
+                        <p className="truncate text-xs text-gray-500">
+                          Workspace
+                        </p>
+                      </div>
 
-                    {/* Selected */}
-                    {isActive && (
-                      <FiCheck size={16} className="shrink-0 text-gray-900" />
-                    )}
-                  </button>
-                );
-              })}
+                      {/* Selected */}
+                      {isActive && (
+                        <FiCheck size={16} className="shrink-0 text-gray-900" />
+                      )}
+                    </button>
+                  );
+                })
+              )}
             </div>
 
             {/* Manage Workspaces */}
@@ -237,6 +254,7 @@ const Sidebar = () => {
       <div className="px-3 pt-4">
         <button
           type="button"
+          onClick={handleNewTask}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
         >
           <FiPlus size={17} />

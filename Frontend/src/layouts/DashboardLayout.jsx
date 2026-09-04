@@ -6,12 +6,10 @@ import Topbar from "../components/dashboard/header/Topbar";
 const DashboardLayout = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Desktop Sidebar */}
       <div className="hidden lg:block">
         <Sidebar />
       </div>
 
-      {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
 
