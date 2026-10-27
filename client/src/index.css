@@ -1,0 +1,560 @@
+/* index.css */
+
+/* ================================
+   Typography — Manrope
+================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+
+@import "tailwindcss";
+
+/* ================================
+   Light Theme — Ocean Teal
+================================ */
+
+:root {
+  color-scheme: light;
+
+  /* Brand */
+  --primary: #0f766e;
+  --primary-hover: #115e59;
+  --primary-active: #134e4a;
+  --primary-soft: #ccfbf1;
+
+  /* Layout */
+  --background: #f7faf9;
+  --surface: #ffffff;
+  --surface-muted: #eff5f3;
+  --surface-elevated: #ffffff;
+
+  /* Text */
+  --text: #172b2a;
+  --text-muted: #506563;
+  --text-subtle: #718582;
+  --text-inverse: #ffffff;
+
+  /* Borders */
+  --border: #dfe9e6;
+  --border-strong: #c3d4d0;
+
+  /* Interaction */
+  --focus: #0f766e;
+  --selection: #99f6e4;
+
+  /* Status */
+  --success: #15803d;
+  --success-soft: #dcfce7;
+
+  --warning: #b45309;
+  --warning-soft: #fef3c7;
+
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+
+  --info: #0369a1;
+  --info-soft: #e0f2fe;
+
+  /* Overlay */
+  --overlay: rgba(23, 43, 42, 0.4);
+
+  /* Typography */
+  font-family:
+    "Manrope",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  font-optical-sizing: auto;
+  font-synthesis: none;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ================================
+   Dark Theme — Deep Charcoal
+================================ */
+
+.dark {
+  color-scheme: dark;
+
+  /* Brand */
+  --primary: #5eead4;
+  --primary-hover: #99f6e4;
+  --primary-active: #2dd4bf;
+  --primary-soft: #123b3a;
+
+  /* Layout */
+  --background: #0b1314;
+  --surface: #121f22;
+  --surface-muted: #172427;
+  --surface-elevated: #1d3032;
+
+  /* Text */
+  --text: #ecfdfb;
+  --text-muted: #b6cac6;
+  --text-subtle: #829a95;
+  --text-inverse: #042f2e;
+
+  /* Borders */
+  --border: #283a3c;
+  --border-strong: #3b5253;
+
+  /* Interaction */
+  --focus: #5eead4;
+  --selection: #134e4a;
+
+  /* Status */
+  --success: #4ade80;
+  --success-soft: #14372a;
+
+  --warning: #fbbf24;
+  --warning-soft: #3d3017;
+
+  --danger: #f87171;
+  --danger-soft: #3f2025;
+
+  --info: #7dd3fc;
+  --info-soft: #153347;
+
+  /* Overlay */
+  --overlay: rgba(0, 0, 0, 0.6);
+}
+
+/* ================================
+   Reset & Base Styles
+================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+
+  background-color: var(--background);
+  color: var(--text);
+
+  font-family:
+    "Manrope",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/* Apply Manrope consistently to form controls */
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-top: 0;
+}
+
+::selection {
+  background: var(--selection);
+  color: var(--text);
+}
+
+/* ================================
+   Form Elements
+================================ */
+
+input,
+textarea,
+select {
+  color: var(--text);
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-subtle);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* ================================
+   Buttons
+================================ */
+
+button,
+.btn {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: var(--text-inverse);
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-primary:active {
+  background-color: var(--primary-active);
+}
+
+.btn-secondary {
+  background-color: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background-color: var(--surface-muted);
+  border-color: var(--border-strong);
+}
+
+/* ================================
+   Cards & Surfaces
+================================ */
+
+.card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.surface-muted {
+  background-color: var(--surface-muted);
+}
+
+.surface-elevated {
+  background-color: var(--surface-elevated);
+}
+
+/* ================================
+   Status Colors
+================================ */
+
+.text-success {
+  color: var(--success);
+}
+
+.bg-success {
+  background-color: var(--success-soft);
+  color: var(--success);
+}
+
+.text-warning {
+  color: var(--warning);
+}
+
+.bg-warning {
+  background-color: var(--warning-soft);
+  color: var(--warning);
+}
+
+.text-danger {
+  color: var(--danger);
+}
+
+.bg-danger {
+  background-color: var(--danger-soft);
+  color: var(--danger);
+}
+
+.text-info {
+  color: var(--info);
+}
+
+.bg-info {
+  background-color: var(--info-soft);
+  color: var(--info);
+}
+
+/* ================================
+   Scrollbars
+================================ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-subtle);
+}
+
+/* ================================
+   Mobile Navbar Dropdown
+================================ */
+
+.mobile-menu-shell {
+  display: grid;
+  grid-template-rows: 0fr;
+
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+
+  transition:
+    grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 300ms;
+}
+
+.mobile-menu-shell.is-open {
+  grid-template-rows: 1fr;
+
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+
+  transition:
+    grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
+}
+
+.mobile-menu-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  min-height: 0;
+  overflow: hidden;
+
+  padding: 0 1rem;
+  border-top: 1px solid transparent;
+
+  background-color: var(--surface);
+
+  transition:
+    padding 250ms ease,
+    border-color 200ms ease;
+}
+
+.mobile-menu-shell.is-open .mobile-menu-inner {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+
+  border-top-color: var(--border);
+}
+
+/* ================================
+   Mobile Navigation Link Animation
+================================ */
+
+.mobile-nav-item {
+  opacity: 0;
+  transform: translateY(-6px);
+
+  transition:
+    opacity 180ms ease,
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.mobile-menu-shell.is-open .mobile-nav-item {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Staggered Entrance */
+
+.mobile-menu-shell.is-open .mobile-nav-item[data-index="0"] {
+  transition-delay: 0ms;
+}
+
+.mobile-menu-shell.is-open .mobile-nav-item[data-index="1"] {
+  transition-delay: 35ms;
+}
+
+.mobile-menu-shell.is-open .mobile-nav-item[data-index="2"] {
+  transition-delay: 70ms;
+}
+
+.mobile-menu-shell.is-open .mobile-nav-item[data-index="3"] {
+  transition-delay: 105ms;
+}
+
+.mobile-nav-item:hover {
+  background-color: var(--surface-muted);
+}
+
+/* ================================
+   Hamburger / Close Icon Animation
+================================ */
+
+.menu-toggle-icon {
+  position: relative;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 20px;
+  height: 20px;
+}
+
+.menu-toggle-symbol {
+  position: absolute;
+
+  transition:
+    opacity 160ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.menu-toggle-symbol.is-visible {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+.menu-toggle-symbol.is-hidden {
+  opacity: 0;
+  transform: rotate(-45deg) scale(0.75);
+  pointer-events: none;
+}
+
+/* ================================
+   Responsive Navbar
+================================ */
+
+@media (min-width: 768px) {
+  .mobile-menu-shell {
+    display: none;
+  }
+}
+
+/* ================================
+   Accessibility
+================================ */
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Respect Reduced-Motion Preferences */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .mobile-menu-shell,
+  .mobile-menu-inner,
+  .mobile-nav-item,
+  .menu-toggle-symbol {
+    transition: none !important;
+    transform: none !important;
+  }
+}
