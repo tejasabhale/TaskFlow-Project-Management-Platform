@@ -217,29 +217,52 @@ const deleteWorkspace = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Workspace deleted successfully."));
 });
 
-// Add a user to a workspace
+// Add an existing TaskFlow user to a workspace using their email
 const addWorkspaceMember = asyncHandler(async (req, res) => {
-  const userId = getCurrentUserId(req);
-  const { memberId, role = "member" } = req.body || {};
+  const requesterId = getCurrentUserId(req);
 
-  if (!mongoose.isValidObjectId(memberId)) {
-    throw new ApiError(400, "A valid member ID is required.");
+  const { email: rawEmail, role = "member" } = req.body || {};
+
+  if (typeof rawEmail !== "string" || !rawEmail.trim()) {
+    throw new ApiError(400, "The member's email address is required.");
+  }
+
+  const email = rawEmail.trim().toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new ApiError(400, "Enter a valid email address.");
   }
 
   if (!["member", "admin"].includes(role)) {
     throw new ApiError(400, "Member role must be either member or admin.");
   }
 
-  const workspace = await getWorkspaceForUser(req.params.workspaceId, userId);
+  const workspace = await getWorkspaceForUser(
+    req.params.workspaceId,
+    requesterId,
+  );
 
-  const requesterRole = requireManager(workspace, userId);
+  const requesterRole = requireManager(workspace, requesterId);
 
+  // Only an owner can assign the admin role.
   if (role === "admin" && requesterRole !== "owner") {
     throw new ApiError(
       403,
       "Only the workspace owner can assign the admin role.",
     );
   }
+
+  // Find an existing registered user by their normalized email.
+  const user = await User.findOne({ email }).select("_id");
+
+  if (!user) {
+    throw new ApiError(
+      404,
+      "No TaskFlow account was found with this email. Ask the person to register first.",
+    );
+  }
+
+  const memberId = user._id;
 
   if (String(workspace.owner) === String(memberId)) {
     throw new ApiError(
@@ -256,18 +279,13 @@ const addWorkspaceMember = asyncHandler(async (req, res) => {
     throw new ApiError(409, "This user is already a workspace member.");
   }
 
-  const userExists = await User.exists({ _id: memberId });
-
-  if (!userExists) {
-    throw new ApiError(404, "User not found.");
-  }
-
   workspace.members.push({
     user: memberId,
     role,
   });
 
   await workspace.save();
+
   await workspace.populate("owner", USER_FIELDS);
   await workspace.populate("members.user", USER_FIELDS);
 

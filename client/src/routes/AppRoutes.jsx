@@ -16,6 +16,7 @@ import Register from "../pages/auth/Register";
 import VerifyOtp from "../pages/auth/VerifyOtp";
 import TaskDetails from "../pages/tasks/TaskDetails";
 import ProjectDetails from "../pages/projects/ProjectDetails";
+import MemberDetails from "../pages/members/MemberDetails";
 
 const AppRoutes = ({ user, logout }) => {
   return (
@@ -36,6 +37,7 @@ const AppRoutes = ({ user, logout }) => {
         <Route path="/dashboard/projects" element={<Projects />} />
         <Route path="/dashboard/projects/:projectId" element={<ProjectDetails />} />
         <Route path="/dashboard/members" element={<Members />} />
+        <Route path="/dashboard/members/:userId" element={<MemberDetails />} />
       </Route>
 
       {/* 404 Catch-All */}

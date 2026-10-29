@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+
 import { registerUser } from "../../services/auth.service.js";
 
 const inputClass =
@@ -14,7 +15,8 @@ const inputClass =
   "outline-none transition-colors focus-visible:outline-2 " +
   "focus-visible:outline-[var(--focus)] placeholder:text-[var(--text-muted)]";
 
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+const passwordRegex =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
 
 export default function Register() {
   const navigate = useNavigate();
@@ -40,20 +42,25 @@ export default function Register() {
       ...current,
       [name]: value,
     }));
+
+    if (error) setError("");
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
 
-    const { fullName, userName, email, mobileNo, password, confirmPassword } =
-      formData;
+    const fullName = formData.fullName.trim();
+    const userName = formData.userName.trim();
+    const email = formData.email.trim().toLowerCase();
+    const mobileNo = formData.mobileNo.trim();
+    const { password, confirmPassword } = formData;
 
     if (
-      !fullName.trim() ||
-      !userName.trim() ||
-      !email.trim() ||
-      !mobileNo.trim() ||
+      !fullName ||
+      !userName ||
+      !email ||
+      !mobileNo ||
       !password ||
       !confirmPassword
     ) {
@@ -63,7 +70,7 @@ export default function Register() {
 
     if (!passwordRegex.test(password)) {
       setError(
-        "Use at least 8 characters with an uppercase letter, a lowercase letter, a number, and a special character (@$!%*?&).",
+        "Use at least 8 characters with an uppercase letter, a lowercase letter, a number, and a special character (@$!%*?&)."
       );
       return;
     }
@@ -77,23 +84,25 @@ export default function Register() {
       setLoading(true);
 
       const result = await registerUser({
-        fullName: fullName.trim(),
-        userName: userName.trim(),
-        email: email.trim().toLowerCase(),
-        mobileNo: mobileNo.trim(),
+        fullName,
+        userName,
+        email,
+        mobileNo,
         password,
       });
 
+      // Registration starts email verification.
+      // Workspace membership is handled separately.
       navigate("/verify-otp", {
         state: {
-          email: result.data?.email || email.trim().toLowerCase(),
+          email: result.data?.email || email,
         },
       });
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to create your account. Please try again.",
+        err.message ||
+        "Unable to create your account. Please try again."
       );
     } finally {
       setLoading(false);
@@ -150,7 +159,7 @@ export default function Register() {
               style={{ color: "var(--text-muted)" }}
             >
               Create your TaskFlow account to organize tasks, manage projects,
-              and bring more clarity to your day.
+              and collaborate with your team.
             </p>
           </div>
 
@@ -158,7 +167,7 @@ export default function Register() {
             {[
               "A clear view of your tasks",
               "Projects organized in one place",
-              "A simpler way to track progress",
+              "Collaborate through shared workspaces",
             ].map((item) => (
               <div key={item} className="flex items-center gap-3">
                 <CheckCircle2
@@ -215,6 +224,28 @@ export default function Register() {
               Enter your details to get started with TaskFlow.
             </p>
 
+            {/* Workspace membership information */}
+            <div
+              className="mt-5 rounded-lg border px-4 py-3"
+              style={{
+                backgroundColor: "var(--surface-muted)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <p className="text-sm font-medium">
+                Joining a team?
+              </p>
+
+              <p
+                className="mt-1 text-xs leading-5"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Verify your email after registering. A workspace owner or admin
+                can then add you to their workspace using your registered email
+                address.
+              </p>
+            </div>
+
             {error && (
               <div
                 role="alert"
@@ -240,6 +271,7 @@ export default function Register() {
                   name="fullName"
                   type="text"
                   autoComplete="name"
+                  autoCapitalize="words"
                   placeholder="Your full name"
                   value={formData.fullName}
                   onChange={handleChange}
@@ -264,6 +296,7 @@ export default function Register() {
                     name="userName"
                     type="text"
                     autoComplete="username"
+                    autoCapitalize="none"
                     placeholder="Choose a username"
                     value={formData.userName}
                     onChange={handleChange}
@@ -311,6 +344,7 @@ export default function Register() {
                   name="email"
                   type="email"
                   autoComplete="email"
+                  autoCapitalize="none"
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={handleChange}
@@ -368,7 +402,7 @@ export default function Register() {
                   style={{ color: "var(--text-muted)" }}
                 >
                   At least 8 characters, including uppercase, lowercase, number,
-                  and special character.
+                  and special character (@$!%*?&).
                 </p>
               </div>
 
@@ -430,6 +464,7 @@ export default function Register() {
                 }}
               >
                 {loading ? "Creating account..." : "Create Account"}
+
                 {!loading && <ArrowRight size={17} />}
               </button>
 
@@ -437,7 +472,7 @@ export default function Register() {
                 className="pt-1 text-center text-xs leading-5"
                 style={{ color: "var(--text-muted)" }}
               >
-                By creating an account, you agree to use TaskFlow responsibly.
+                You will need to verify your email before using your account.
               </p>
             </form>
 

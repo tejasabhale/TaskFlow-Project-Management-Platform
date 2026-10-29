@@ -3,6 +3,7 @@ import authRoutes from "./routes/auth.routes.js";
 import workspaceRoutes from "./routes/workspace.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import projectRoutes from "./routes/project.routes.js";
+import profileRoutes from "./routes/profile.routes.js";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import cors from "cors";
@@ -20,6 +21,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/workspaces", workspaceRoutes);
 app.use("/api/v1/tasks", taskRoutes);
 app.use("/api/v1/projects", projectRoutes);
+app.use("/api/v1/profile", profileRoutes);
 
 // Error Handler
 app.use(errorHandler);

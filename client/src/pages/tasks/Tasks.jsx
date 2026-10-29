@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     Search,
@@ -9,6 +8,11 @@ import {
     Plus,
     X,
     ArrowUpRight,
+    CalendarDays,
+    UserRound,
+    Paperclip,
+    Tag,
+    CheckCircle2,
 } from "lucide-react";
 
 import { useWorkspace } from "../../context/WorkspaceContext.jsx";
@@ -32,19 +36,19 @@ const statusLabels = {
 
 const statusStyles = {
     todo: {
-        backgroundColor: "var(--surface-muted)",
+        background: "var(--surface-muted)",
         color: "var(--text-muted)",
     },
     inProgress: {
-        backgroundColor: "var(--primary-soft, #e1f2ef)",
+        background: "var(--primary-soft, #e1f2ef)",
         color: "var(--primary)",
     },
     review: {
-        backgroundColor: "#fff7ed",
+        background: "#fff7ed",
         color: "#c2410c",
     },
     completed: {
-        backgroundColor: "#ecfdf5",
+        background: "#ecfdf5",
         color: "#047857",
     },
 };
@@ -68,7 +72,7 @@ const getId = (value) => {
     if (!value) return "";
 
     if (typeof value === "object") {
-        return String(value._id || value.id || "");
+        return String(value._id || value.id || value.userId || "");
     }
 
     return String(value);
@@ -77,49 +81,124 @@ const getId = (value) => {
 function getList(response, key) {
     let result = response?.data ?? response;
 
-    if (result?.data) result = result.data;
+    for (let depth = 0; depth < 4; depth += 1) {
+        if (Array.isArray(result)) return result;
+        if (!result || typeof result !== "object") break;
 
-    if (Array.isArray(result)) return result;
+        if (key && Array.isArray(result[key])) {
+            return result[key];
+        }
 
-    if (Array.isArray(result?.[key])) {
-        return result[key];
+        if (result.data !== undefined) {
+            result = result.data;
+            continue;
+        }
+
+        break;
     }
 
     return [];
 }
 
-const formatDate = (date) => {
-    if (!date) return "No due date";
+function getTaskResponse(response) {
+    let result = response?.data ?? response;
 
-    const parsedDate = new Date(date);
+    for (let depth = 0; depth < 4; depth += 1) {
+        if (!result || typeof result !== "object") return null;
+        if (result._id) return result;
 
-    if (Number.isNaN(parsedDate.getTime())) {
-        return "Invalid date";
+        if (result.task) {
+            result = result.task;
+            continue;
+        }
+
+        if (result.data !== undefined) {
+            result = result.data;
+            continue;
+        }
+
+        break;
     }
 
-    return new Intl.DateTimeFormat("en", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    }).format(parsedDate);
-};
+    return null;
+}
 
-const formatPriority = (priority = "medium") =>
-    priority.charAt(0).toUpperCase() + priority.slice(1);
+function getPersonName(person) {
+    if (!person) return "Unassigned";
+
+    if (typeof person === "string") {
+        return "User details unavailable";
+    }
+
+    return (
+        person.fullName ||
+        person.userName ||
+        person.username ||
+        person.name ||
+        person.email ||
+        "User details unavailable"
+    );
+}
+
+function getProjectName(project) {
+    if (!project) return "Unknown project";
+
+    if (typeof project === "string") {
+        return "Project details unavailable";
+    }
+
+    return project.name || project.title || "Unknown project";
+}
+
+function formatDate(value) {
+    if (!value) return "No due date";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "No due date";
+
+    return new Intl.DateTimeFormat("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    }).format(date);
+}
+
+function isOverdue(task) {
+    if (!task.dueDate || task.status === "completed") return false;
+
+    const date = new Date(task.dueDate);
+
+    if (Number.isNaN(date.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+
+    return date < today;
+}
+
+function formatPriority(priority = "medium") {
+    return priority.charAt(0).toUpperCase() + priority.slice(1);
+}
 
 export default function Tasks() {
     const {
         workspaces,
-        currentWorkspace: selectedWorkspace,
+        currentWorkspace,
         currentWorkspaceId: workspaceId,
         setCurrentWorkspace,
         loading: loadingWorkspaces,
         isOwner,
+        canManageMembers,
     } = useWorkspace();
+
+    const canViewAllTasks = Boolean(isOwner || canManageMembers);
 
     const [tasks, setTasks] = useState([]);
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
+    const [assigneeFilter, setAssigneeFilter] = useState("All");
 
     const [loadingTasks, setLoadingTasks] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -127,40 +206,58 @@ export default function Tasks() {
 
     const [createOpen, setCreateOpen] = useState(false);
     const [taskForm, setTaskForm] = useState(initialTaskForm);
-
     const [projects, setProjects] = useState([]);
     const [loadingProjects, setLoadingProjects] = useState(false);
     const [creatingTask, setCreatingTask] = useState(false);
-
     const [createError, setCreateError] = useState("");
     const [createMessage, setCreateMessage] = useState("");
 
-    const isWorkspaceOwner = Boolean(isOwner);
+    const [loadingAction, setLoadingAction] = useState(false);
 
-    useEffect(() => {
-        setSearch("");
-        setStatusFilter("All");
-        setCreateOpen(false);
-        setCreateError("");
-        setCreateMessage("");
-        setError("");
-    }, [workspaceId]);
-
-    // Load tasks for the shared selected workspace.
-    useEffect(() => {
+    const loadTasks = useCallback(async () => {
         if (!workspaceId) {
             setTasks([]);
-            setLoadingTasks(false);
             return;
         }
 
+        setLoadingAction(true);
+        setError("");
+
+        try {
+            const response = await getTasks({ workspaceId });
+            setTasks(getList(response, "tasks"));
+        } catch (err) {
+            setError(
+                err?.response?.data?.message ||
+                err?.message ||
+                "Unable to load tasks."
+            );
+        } finally {
+            setLoadingAction(false);
+        }
+    }, [workspaceId]);
+
+    useEffect(() => {
         let active = true;
 
         const fetchTasks = async () => {
-            try {
-                setLoadingTasks(true);
-                setError("");
+            if (!workspaceId) {
+                setTasks([]);
+                setLoadingTasks(false);
+                return;
+            }
 
+            setTasks([]);
+            setLoadingTasks(true);
+            setError("");
+            setSearch("");
+            setStatusFilter("All");
+            setAssigneeFilter("All");
+            setCreateOpen(false);
+            setCreateError("");
+            setCreateMessage("");
+
+            try {
                 const response = await getTasks({ workspaceId });
 
                 if (active) {
@@ -170,11 +267,10 @@ export default function Tasks() {
                 if (!active) return;
 
                 setTasks([]);
-
                 setError(
                     err?.response?.data?.message ||
                     err?.message ||
-                    "Unable to load tasks. Please try again."
+                    "Unable to load tasks."
                 );
             } finally {
                 if (active) setLoadingTasks(false);
@@ -187,6 +283,114 @@ export default function Tasks() {
             active = false;
         };
     }, [workspaceId]);
+
+    // Build the list of users who can receive tasks.
+    const workspaceMembers = useMemo(() => {
+        const result = [];
+        const seen = new Set();
+
+        const addMember = (person) => {
+            if (!person || typeof person !== "object") return;
+
+            const id = getId(person);
+
+            if (!id || seen.has(id)) return;
+
+            seen.add(id);
+            result.push({
+                _id: id,
+                name: getPersonName(person),
+                email: person.email || "",
+            });
+        };
+
+        addMember(currentWorkspace?.owner);
+
+        for (const item of currentWorkspace?.members || []) {
+            addMember(item?.user || item?.member || item);
+        }
+
+        return result;
+    }, [currentWorkspace]);
+
+    // Assignee options are derived from the tasks returned by the API.
+    const assignees = useMemo(() => {
+        const users = new Map();
+
+        tasks.forEach((task) => {
+            const person = task.assignedTo;
+
+            if (person && typeof person === "object") {
+                const id = getId(person);
+
+                if (id) {
+                    users.set(id, {
+                        id,
+                        name: getPersonName(person),
+                    });
+                }
+            }
+        });
+
+        return [...users.values()].sort((a, b) =>
+            a.name.localeCompare(b.name)
+        );
+    }, [tasks]);
+
+    const filteredTasks = useMemo(() => {
+        const query = search.trim().toLowerCase();
+
+        return tasks.filter((task) => {
+            const projectName = getProjectName(task.project);
+            const assigneeName = getPersonName(task.assignedTo);
+            const creatorName = getPersonName(task.createdBy);
+
+            const matchesSearch =
+                (task.title || "").toLowerCase().includes(query) ||
+                (task.description || "").toLowerCase().includes(query) ||
+                projectName.toLowerCase().includes(query) ||
+                assigneeName.toLowerCase().includes(query) ||
+                creatorName.toLowerCase().includes(query);
+
+            const matchesStatus =
+                statusFilter === "All" ||
+                task.status === statusFilter;
+
+            const matchesAssignee =
+                assigneeFilter === "All" ||
+                getId(task.assignedTo) === assigneeFilter;
+
+            return matchesSearch && matchesStatus && matchesAssignee;
+        });
+    }, [tasks, search, statusFilter, assigneeFilter]);
+
+    const statistics = useMemo(() => {
+        const completed = tasks.filter(
+            (task) => task.status === "completed"
+        ).length;
+
+        const inProgress = tasks.filter(
+            (task) => task.status === "inProgress"
+        ).length;
+
+        const overdue = tasks.filter(isOverdue).length;
+
+        return {
+            total: tasks.length,
+            completed,
+            inProgress,
+            overdue,
+        };
+    }, [tasks]);
+
+    const updateTaskForm = (event) => {
+        const { name, value } = event.target;
+
+        setTaskForm((current) => ({
+            ...current,
+            [name]: value,
+        }));
+    };
 
     const loadProjects = async () => {
         if (!workspaceId) {
@@ -203,29 +407,29 @@ export default function Tasks() {
                 params: { workspaceId },
             });
 
-            const list = getList(response, "projects").filter(
+            const projectList = getList(response, "projects").filter(
                 (project) =>
                     !project.workspace ||
                     getId(project.workspace) === getId(workspaceId)
             );
 
-            setProjects(list);
+            setProjects(projectList);
 
             setTaskForm((current) => ({
                 ...current,
-                project: list[0]?._id || "",
+                project: getId(projectList[0]),
             }));
 
-            if (list.length === 0) {
+            if (projectList.length === 0) {
                 setCreateError(
-                    "This workspace has no projects. Create a project before creating a task."
+                    "Create a project in this workspace before adding a task."
                 );
             }
         } catch (err) {
             setCreateError(
                 err?.response?.data?.message ||
                 err?.message ||
-                "Unable to load projects for this workspace."
+                "Unable to load projects."
             );
         } finally {
             setLoadingProjects(false);
@@ -233,7 +437,7 @@ export default function Tasks() {
     };
 
     const handleOpenCreate = async () => {
-        if (!workspaceId || !isWorkspaceOwner) return;
+        if (!workspaceId || !isOwner) return;
 
         setTaskForm(initialTaskForm);
         setCreateError("");
@@ -245,17 +449,16 @@ export default function Tasks() {
 
     const handleCreateTask = async (event) => {
         event.preventDefault();
-
         setCreateError("");
         setCreateMessage("");
 
-        if (!isWorkspaceOwner) {
+        if (!isOwner) {
             setCreateError("Only the workspace owner can create tasks.");
             return;
         }
 
-        if (!workspaceId) {
-            setCreateError("Please select a workspace.");
+        if (!workspaceId || !taskForm.project) {
+            setCreateError("Select a workspace and project.");
             return;
         }
 
@@ -264,8 +467,24 @@ export default function Tasks() {
             return;
         }
 
-        if (!taskForm.project) {
-            setCreateError("Please select a project.");
+        const selectedProject = projects.find(
+            (project) => getId(project) === taskForm.project
+        );
+
+        if (!selectedProject) {
+            setCreateError("The selected project is not available.");
+            return;
+        }
+
+        if (
+            taskForm.assignedTo &&
+            !workspaceMembers.some(
+                (member) => member._id === taskForm.assignedTo
+            )
+        ) {
+            setCreateError(
+                "The selected assignee is not a member of this workspace."
+            );
             return;
         }
 
@@ -286,34 +505,20 @@ export default function Tasks() {
                 }),
             };
 
-            const response = await createTask(payload);
-
-            const createdTask =
-                response?.data?.data ||
-                response?.data?.task ||
-                response?.data;
-
-            if (!createdTask?._id) {
-                throw new Error(
-                    "The server did not return the created task. Refresh the list to check."
-                );
-            }
-
-            setTasks((current) => [
-                createdTask,
-                ...current.filter(
-                    (task) => task._id !== createdTask._id
-                ),
-            ]);
+            await createTask(payload);
 
             setCreateOpen(false);
             setTaskForm(initialTaskForm);
             setCreateMessage("Task created successfully.");
+
+            // Reload from the backend so populated fields are displayed.
+            const response = await getTasks({ workspaceId });
+            setTasks(getList(response, "tasks"));
         } catch (err) {
             setCreateError(
                 err?.response?.data?.message ||
                 err?.message ||
-                "Unable to create task. Please try again."
+                "Unable to create task."
             );
         } finally {
             setCreatingTask(false);
@@ -321,7 +526,7 @@ export default function Tasks() {
     };
 
     const handleRefresh = async () => {
-        if (!workspaceId || loadingTasks) return;
+        if (!workspaceId || refreshing || loadingTasks) return;
 
         setRefreshing(true);
         setError("");
@@ -333,90 +538,12 @@ export default function Tasks() {
             setError(
                 err?.response?.data?.message ||
                 err?.message ||
-                "Unable to refresh tasks. Please try again."
+                "Unable to refresh tasks."
             );
         } finally {
             setRefreshing(false);
         }
     };
-
-    // Build the list of people who can be assigned a task.
-    const workspaceMembers = [];
-    const seenMemberIds = new Set();
-
-    if (
-        selectedWorkspace?.owner &&
-        typeof selectedWorkspace.owner === "object"
-    ) {
-        const owner = selectedWorkspace.owner;
-        const ownerId = getId(owner);
-
-        if (ownerId) {
-            workspaceMembers.push({
-                _id: ownerId,
-                fullName:
-                    owner.fullName ||
-                    owner.userName ||
-                    owner.name ||
-                    owner.email ||
-                    "Workspace owner",
-            });
-
-            seenMemberIds.add(ownerId);
-        }
-    }
-
-    for (const item of selectedWorkspace?.members || []) {
-        const memberUser = item.user || item.member;
-        const memberId = getId(memberUser);
-
-        if (
-            !memberId ||
-            seenMemberIds.has(memberId) ||
-            typeof memberUser !== "object"
-        ) {
-            continue;
-        }
-
-        workspaceMembers.push({
-            _id: memberId,
-            fullName:
-                memberUser.fullName ||
-                memberUser.userName ||
-                memberUser.name ||
-                memberUser.email ||
-                "Workspace member",
-        });
-
-        seenMemberIds.add(memberId);
-    }
-
-    const filteredTasks = tasks.filter((task) => {
-        const projectName =
-            typeof task.project === "object"
-                ? task.project?.name || task.project?.title || ""
-                : "";
-
-        const assignedName =
-            typeof task.assignedTo === "object"
-                ? task.assignedTo?.fullName ||
-                task.assignedTo?.name ||
-                ""
-                : "";
-
-        const query = search.trim().toLowerCase();
-
-        const matchesSearch =
-            (task.title || "").toLowerCase().includes(query) ||
-            projectName.toLowerCase().includes(query) ||
-            assignedName.toLowerCase().includes(query);
-
-        const matchesStatus =
-            statusFilter === "All" ||
-            task.status === statusFilter;
-
-        return matchesSearch && matchesStatus;
-    });
 
     return (
         <div
@@ -426,20 +553,22 @@ export default function Tasks() {
             {/* Heading */}
             <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <h2 className="text-2xl font-semibold tracking-tight">
-                        My Tasks
-                    </h2>
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {canViewAllTasks ? "Workspace Tasks" : "My Tasks"}
+                    </h1>
 
                     <p
                         className="mt-1 text-sm"
                         style={{ color: "var(--text-muted)" }}
                     >
-                        Manage and track your work in one place.
+                        {canViewAllTasks
+                            ? "View and manage tasks assigned across your workspace."
+                            : "View tasks assigned to you in this workspace."}
                     </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    {isWorkspaceOwner && (
+                    {isOwner && (
                         <button
                             type="button"
                             onClick={handleOpenCreate}
@@ -455,7 +584,7 @@ export default function Tasks() {
                     <button
                         type="button"
                         onClick={handleRefresh}
-                        disabled={!workspaceId || loadingTasks}
+                        disabled={!workspaceId || refreshing || loadingTasks}
                         className="inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium disabled:opacity-50"
                         style={{
                             borderColor: "var(--border)",
@@ -485,7 +614,7 @@ export default function Tasks() {
                 </div>
             )}
 
-            {/* Workspace Selector */}
+            {/* Workspace selector */}
             <section
                 className="rounded-xl border p-4"
                 style={{
@@ -514,36 +643,74 @@ export default function Tasks() {
                         borderColor: "var(--border)",
                     }}
                 >
-                    {loadingWorkspaces ? (
-                        <option value="">Loading workspaces...</option>
-                    ) : workspaces.length === 0 ? (
-                        <option value="">No workspaces available</option>
-                    ) : (
-                        workspaces.map((workspace) => (
-                            <option
-                                key={getId(workspace)}
-                                value={getId(workspace)}
-                            >
-                                {workspace.name}
-                            </option>
-                        ))
-                    )}
+                    {workspaces.map((workspace) => (
+                        <option
+                            key={getId(workspace)}
+                            value={getId(workspace)}
+                        >
+                            {workspace.name}
+                        </option>
+                    ))}
                 </select>
-
-                {selectedWorkspace && (
-                    <p
-                        className="mt-2 text-xs"
-                        style={{ color: "var(--text-muted)" }}
-                    >
-                        Showing tasks in {selectedWorkspace.name}.
-                        {isWorkspaceOwner
-                            ? " You can create tasks in this workspace."
-                            : ""}
-                    </p>
-                )}
             </section>
 
-            {/* Search and Status Filters */}
+            {/* Statistics */}
+            <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                {[
+                    {
+                        label: "Total tasks",
+                        value: statistics.total,
+                        icon: ClipboardList,
+                    },
+                    {
+                        label: "Completed",
+                        value: statistics.completed,
+                        icon: CheckCircle2,
+                    },
+                    {
+                        label: "In progress",
+                        value: statistics.inProgress,
+                        icon: RefreshCw,
+                    },
+                    {
+                        label: "Overdue",
+                        value: statistics.overdue,
+                        icon: AlertCircle,
+                    },
+                ].map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                        <div
+                            key={item.label}
+                            className="rounded-xl border p-4 sm:p-5"
+                            style={{
+                                background: "var(--surface)",
+                                borderColor: "var(--border)",
+                            }}
+                        >
+                            <div className="flex items-center justify-between gap-2">
+                                <p
+                                    className="text-sm"
+                                    style={{ color: "var(--text-muted)" }}
+                                >
+                                    {item.label}
+                                </p>
+                                <Icon
+                                    size={18}
+                                    style={{ color: "var(--primary)" }}
+                                />
+                            </div>
+
+                            <p className="mt-3 text-2xl font-semibold">
+                                {loadingTasks ? "—" : item.value}
+                            </p>
+                        </div>
+                    );
+                })}
+            </section>
+
+            {/* Search and filters */}
             <section className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative min-w-0 flex-1">
                     <Search
@@ -556,7 +723,7 @@ export default function Tasks() {
                         type="search"
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search tasks or projects..."
+                        placeholder="Search title, project, assignee..."
                         className="w-full rounded-lg border py-2.5 pl-10 pr-4 text-sm outline-none"
                         style={{
                             background: "var(--surface)",
@@ -583,28 +750,57 @@ export default function Tasks() {
                         </option>
                     ))}
                 </select>
+
+                {canViewAllTasks && (
+                    <select
+                        aria-label="Filter tasks by assignee"
+                        value={assigneeFilter}
+                        onChange={(event) =>
+                            setAssigneeFilter(event.target.value)
+                        }
+                        className="rounded-lg border px-4 py-2.5 text-sm outline-none"
+                        style={{
+                            background: "var(--surface)",
+                            borderColor: "var(--border)",
+                            color: "var(--text)",
+                        }}
+                    >
+                        <option value="All">All assignees</option>
+                        <option value="Unassigned">Unassigned</option>
+
+                        {assignees.map((person) => (
+                            <option key={person.id} value={person.id}>
+                                {person.name}
+                            </option>
+                        ))}
+                    </select>
+                )}
             </section>
 
             {/* Errors */}
-            {error && (
+            {(error || loadingAction) && (
                 <div
-                    role="alert"
+                    role={error ? "alert" : "status"}
                     className="flex items-start gap-3 rounded-lg border p-4 text-sm"
                     style={{
-                        borderColor: "#dc7777",
+                        borderColor: error ? "#dc7777" : "var(--border)",
                         background: "var(--surface)",
-                        color: "#c24141",
+                        color: error ? "#c24141" : "var(--text-muted)",
                     }}
                 >
-                    <AlertCircle
-                        size={18}
-                        className="mt-0.5 shrink-0"
-                    />
-                    <span>{error}</span>
+                    {error ? (
+                        <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    ) : (
+                        <RefreshCw
+                            size={18}
+                            className="animate-spin"
+                        />
+                    )}
+                    <span>{error || "Refreshing tasks..."}</span>
                 </div>
             )}
 
-            {/* Tasks Table */}
+            {/* Task table */}
             <section
                 className="overflow-hidden rounded-xl border"
                 style={{
@@ -616,7 +812,9 @@ export default function Tasks() {
                     className="border-b px-5 py-4"
                     style={{ borderColor: "var(--border)" }}
                 >
-                    <h3 className="font-semibold">All Tasks</h3>
+                    <h2 className="font-semibold">
+                        {canViewAllTasks ? "All workspace tasks" : "Tasks assigned to me"}
+                    </h2>
 
                     <p
                         className="mt-1 text-sm"
@@ -629,20 +827,24 @@ export default function Tasks() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[750px] text-left text-sm">
+                    <table className="w-full min-w-[1050px] text-left text-sm">
                         <thead
-                            className="text-xs uppercase tracking-wide"
                             style={{
                                 background: "var(--surface-muted)",
                                 color: "var(--text-muted)",
                             }}
                         >
                             <tr>
-                                <th className="px-5 py-3 font-medium">Task</th>
-                                <th className="px-5 py-3 font-medium">Project</th>
-                                <th className="px-5 py-3 font-medium">Priority</th>
-                                <th className="px-5 py-3 font-medium">Due Date</th>
-                                <th className="px-5 py-3 font-medium">Status</th>
+                                <th className="px-4 py-3 font-medium">Task</th>
+                                <th className="px-4 py-3 font-medium">Project</th>
+                                <th className="px-4 py-3 font-medium">Assigned to</th>
+                                {canViewAllTasks && (
+                                    <th className="px-4 py-3 font-medium">Created by</th>
+                                )}
+                                <th className="px-4 py-3 font-medium">Priority</th>
+                                <th className="px-4 py-3 font-medium">Due date</th>
+                                <th className="px-4 py-3 font-medium">Status</th>
+                                <th className="px-4 py-3 font-medium">Files / Labels</th>
                             </tr>
                         </thead>
 
@@ -650,7 +852,7 @@ export default function Tasks() {
                             {loadingTasks ? (
                                 <tr>
                                     <td
-                                        colSpan={5}
+                                        colSpan={canViewAllTasks ? 8 : 7}
                                         className="px-5 py-14 text-center"
                                     >
                                         <RefreshCw
@@ -658,7 +860,6 @@ export default function Tasks() {
                                             className="mx-auto animate-spin"
                                             style={{ color: "var(--primary)" }}
                                         />
-
                                         <p
                                             className="mt-3 text-sm"
                                             style={{ color: "var(--text-muted)" }}
@@ -667,45 +868,42 @@ export default function Tasks() {
                                         </p>
                                     </td>
                                 </tr>
-                            ) : filteredTasks.length > 0 ? (
+                            ) : filteredTasks.length ? (
                                 filteredTasks.map((task) => {
                                     const status = task.status || "todo";
                                     const priority = task.priority || "medium";
-
-                                    const projectName =
-                                        typeof task.project === "object"
-                                            ? task.project?.name ||
-                                            task.project?.title ||
-                                            "Unknown project"
-                                            : "Unknown project";
+                                    const overdue = isOverdue(task);
+                                    const labels = Array.isArray(task.labels)
+                                        ? task.labels
+                                        : [];
+                                    const attachments = Array.isArray(task.attachments)
+                                        ? task.attachments
+                                        : [];
 
                                     return (
                                         <tr
-                                            key={task._id}
-                                            className="border-t transition-colors hover:bg-[var(--surface-muted)]"
+                                            key={getId(task)}
+                                            className="border-t align-top hover:bg-[var(--surface-muted)]"
                                             style={{ borderColor: "var(--border)" }}
                                         >
-                                            <td className="px-5 py-4">
+                                            <td className="max-w-xs px-4 py-4">
                                                 <Link
-                                                    to={`/dashboard/tasks/${task._id}`}
-                                                    className="group inline-flex max-w-sm items-center gap-1.5 font-medium hover:underline"
+                                                    to={`/dashboard/tasks/${getId(task)}`}
+                                                    className="inline-flex items-center gap-1 font-medium hover:underline"
                                                     style={{ color: "var(--text)" }}
-                                                    aria-label={`View details for ${task.title}`}
                                                 >
                                                     <span className="break-words">
-                                                        {task.title}
+                                                        {task.title || "Untitled task"}
                                                     </span>
-
                                                     <ArrowUpRight
-                                                        size={15}
-                                                        className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                                                        style={{ color: "var(--primary)" }}
+                                                        size={14}
+                                                        className="shrink-0"
                                                     />
                                                 </Link>
 
                                                 {task.description && (
                                                     <p
-                                                        className="mt-1 max-w-sm truncate text-xs"
+                                                        className="mt-1 line-clamp-2 text-xs leading-5"
                                                         style={{ color: "var(--text-muted)" }}
                                                     >
                                                         {task.description}
@@ -713,31 +911,69 @@ export default function Tasks() {
                                                 )}
                                             </td>
 
-                                            <td
-                                                className="px-5 py-4"
-                                                style={{ color: "var(--text-muted)" }}
-                                            >
-                                                {projectName}
+                                            <td className="px-4 py-4">
+                                                {getProjectName(task.project)}
                                             </td>
 
-                                            <td
-                                                className="px-5 py-4 font-medium"
-                                                style={
-                                                    priorityStyles[priority] ||
-                                                    priorityStyles.medium
-                                                }
-                                            >
-                                                {formatPriority(priority)}
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div
+                                                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                                                        style={{
+                                                            background: "var(--primary-soft, #e1f2ef)",
+                                                            color: "var(--primary)",
+                                                        }}
+                                                    >
+                                                        {getPersonName(task.assignedTo)
+                                                            .charAt(0)
+                                                            .toUpperCase()}
+                                                    </div>
+
+                                                    <span>
+                                                        {getPersonName(task.assignedTo)}
+                                                    </span>
+                                                </div>
                                             </td>
 
-                                            <td
-                                                className="px-5 py-4"
-                                                style={{ color: "var(--text-muted)" }}
-                                            >
-                                                {formatDate(task.dueDate)}
+                                            {canViewAllTasks && (
+                                                <td className="px-4 py-4">
+                                                    {getPersonName(task.createdBy)}
+                                                </td>
+                                            )}
+
+                                            <td className="px-4 py-4">
+                                                <span
+                                                    className="font-medium"
+                                                    style={
+                                                        priorityStyles[priority] ||
+                                                        priorityStyles.medium
+                                                    }
+                                                >
+                                                    {formatPriority(priority)}
+                                                </span>
                                             </td>
 
-                                            <td className="px-5 py-4">
+                                            <td className="whitespace-nowrap px-4 py-4">
+                                                <div
+                                                    className="flex items-center gap-1.5"
+                                                    style={{
+                                                        color: overdue
+                                                            ? "#dc2626"
+                                                            : "var(--text-muted)",
+                                                    }}
+                                                >
+                                                    <CalendarDays size={14} />
+                                                    {formatDate(task.dueDate)}
+                                                </div>
+
+                                                {overdue && (
+                                                    <span className="mt-1 block text-xs font-medium text-red-600">
+                                                        Overdue
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            <td className="px-4 py-4">
                                                 <span
                                                     className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium"
                                                     style={
@@ -748,13 +984,59 @@ export default function Tasks() {
                                                     {statusLabels[status] || status}
                                                 </span>
                                             </td>
+
+                                            <td className="px-4 py-4">
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    <span
+                                                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs"
+                                                        style={{
+                                                            background: "var(--surface-muted)",
+                                                            color: "var(--text-muted)",
+                                                        }}
+                                                    >
+                                                        <Paperclip size={12} />
+                                                        {attachments.length}
+                                                    </span>
+
+                                                    {labels.length > 0 ? (
+                                                        labels.slice(0, 2).map((label, index) => (
+                                                            <span
+                                                                key={getId(label) || index}
+                                                                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs"
+                                                                style={{
+                                                                    background: "var(--surface-muted)",
+                                                                    color: "var(--text-muted)",
+                                                                }}
+                                                            >
+                                                                <Tag size={11} />
+                                                                {typeof label === "object"
+                                                                    ? label.name || label.title || "Label"
+                                                                    : "Label"}
+                                                            </span>
+                                                        ))
+                                                    ) : (
+                                                        <span
+                                                            className="text-xs"
+                                                            style={{ color: "var(--text-muted)" }}
+                                                        >
+                                                            No labels
+                                                        </span>
+                                                    )}
+
+                                                    {labels.length > 2 && (
+                                                        <span className="text-xs text-slate-500">
+                                                            +{labels.length - 2}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
                                     <td
-                                        colSpan={5}
+                                        colSpan={canViewAllTasks ? 8 : 7}
                                         className="px-5 py-14 text-center"
                                     >
                                         <ClipboardList
@@ -765,17 +1047,19 @@ export default function Tasks() {
 
                                         <p className="mt-3 text-sm font-medium">
                                             {tasks.length === 0
-                                                ? "No tasks in this workspace yet."
-                                                : "No tasks match your search."}
+                                                ? canViewAllTasks
+                                                    ? "No tasks in this workspace yet."
+                                                    : "No tasks are assigned to you."
+                                                : "No tasks match your filters."}
                                         </p>
 
                                         <p
                                             className="mt-1 text-sm"
                                             style={{ color: "var(--text-muted)" }}
                                         >
-                                            {tasks.length === 0
-                                                ? "Create a task to get started."
-                                                : "Try another search term or status filter."}
+                                            {canViewAllTasks
+                                                ? "Create a task or change your filters to see more results."
+                                                : "Ask your workspace owner to assign a task to you."}
                                         </p>
                                     </td>
                                 </tr>
@@ -785,19 +1069,9 @@ export default function Tasks() {
                 </div>
             </section>
 
-            {/* Create Task Dialog */}
+            {/* Create task dialog */}
             {createOpen && (
-                <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6"
-                    onMouseDown={(event) => {
-                        if (
-                            event.target === event.currentTarget &&
-                            !creatingTask
-                        ) {
-                            setCreateOpen(false);
-                        }
-                    }}
-                >
+                <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
                     <section
                         role="dialog"
                         aria-modal="true"
@@ -811,16 +1085,6 @@ export default function Tasks() {
                     >
                         <div className="flex items-start justify-between gap-4">
                             <div>
-                                <div
-                                    className="mb-4 flex size-10 items-center justify-center rounded-lg"
-                                    style={{
-                                        background: "var(--primary-soft, #e1f2ef)",
-                                        color: "var(--primary)",
-                                    }}
-                                >
-                                    <ClipboardList size={20} />
-                                </div>
-
                                 <h2
                                     id="create-task-title"
                                     className="text-xl font-semibold"
@@ -832,8 +1096,7 @@ export default function Tasks() {
                                     className="mt-1 text-sm"
                                     style={{ color: "var(--text-muted)" }}
                                 >
-                                    Add a task to{" "}
-                                    {selectedWorkspace?.name || "this workspace"}.
+                                    Add a task to {currentWorkspace?.name || "this workspace"}.
                                 </p>
                             </div>
 
@@ -855,6 +1118,7 @@ export default function Tasks() {
                                 className="mt-5 rounded-lg border px-3 py-2.5 text-sm"
                                 style={{
                                     borderColor: "#dc7777",
+                                    background: "var(--surface)",
                                     color: "#c24141",
                                 }}
                             >
@@ -867,55 +1131,37 @@ export default function Tasks() {
                             className="mt-6 space-y-4"
                         >
                             <div>
-                                <label
-                                    htmlFor="task-title"
-                                    className="text-sm font-medium"
-                                >
+                                <label htmlFor="task-title" className="text-sm font-medium">
                                     Task title
                                 </label>
-
                                 <input
                                     id="task-title"
-                                    type="text"
-                                    minLength={1}
-                                    maxLength={200}
+                                    name="title"
                                     value={taskForm.title}
-                                    onChange={(event) =>
-                                        setTaskForm((current) => ({
-                                            ...current,
-                                            title: event.target.value,
-                                        }))
-                                    }
-                                    placeholder="e.g. Implement user authentication"
+                                    onChange={updateTaskForm}
+                                    maxLength={200}
+                                    required
+                                    placeholder="Implement user authentication"
                                     className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
                                     style={{
                                         background: "var(--surface)",
                                         color: "var(--text)",
                                         borderColor: "var(--border)",
                                     }}
-                                    required
                                 />
                             </div>
 
                             <div>
-                                <label
-                                    htmlFor="task-description"
-                                    className="text-sm font-medium"
-                                >
-                                    Description (optional)
+                                <label htmlFor="task-description" className="text-sm font-medium">
+                                    Description
                                 </label>
-
                                 <textarea
                                     id="task-description"
+                                    name="description"
+                                    value={taskForm.description}
+                                    onChange={updateTaskForm}
                                     rows={3}
                                     maxLength={3000}
-                                    value={taskForm.description}
-                                    onChange={(event) =>
-                                        setTaskForm((current) => ({
-                                            ...current,
-                                            description: event.target.value,
-                                        }))
-                                    }
                                     placeholder="Describe the task..."
                                     className="mt-2 w-full resize-y rounded-lg border px-3.5 py-3 text-sm outline-none"
                                     style={{
@@ -927,68 +1173,45 @@ export default function Tasks() {
                             </div>
 
                             <div>
-                                <label
-                                    htmlFor="task-project"
-                                    className="text-sm font-medium"
-                                >
+                                <label htmlFor="task-project" className="text-sm font-medium">
                                     Project
                                 </label>
-
                                 <select
                                     id="task-project"
+                                    name="project"
                                     value={taskForm.project}
-                                    onChange={(event) =>
-                                        setTaskForm((current) => ({
-                                            ...current,
-                                            project: event.target.value,
-                                        }))
-                                    }
-                                    disabled={
-                                        loadingProjects || projects.length === 0
-                                    }
-                                    className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none disabled:opacity-60"
+                                    onChange={updateTaskForm}
+                                    disabled={loadingProjects || projects.length === 0}
+                                    required
+                                    className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
                                     style={{
                                         background: "var(--surface)",
                                         color: "var(--text)",
                                         borderColor: "var(--border)",
                                     }}
-                                    required
                                 >
                                     <option value="">
                                         {loadingProjects
                                             ? "Loading projects..."
-                                            : projects.length === 0
-                                                ? "No projects available"
-                                                : "Select a project"}
+                                            : "Select a project"}
                                     </option>
-
                                     {projects.map((project) => (
-                                        <option key={project._id} value={project._id}>
-                                            {project.name ||
-                                                project.title ||
-                                                "Untitled project"}
+                                        <option key={getId(project)} value={getId(project)}>
+                                            {getProjectName(project)}
                                         </option>
                                     ))}
                                 </select>
                             </div>
 
                             <div>
-                                <label
-                                    htmlFor="task-assignee"
-                                    className="text-sm font-medium"
-                                >
+                                <label htmlFor="task-assignee" className="text-sm font-medium">
                                     Assign to
                                 </label>
-
                                 <select
                                     id="task-assignee"
+                                    name="assignedTo"
                                     value={taskForm.assignedTo}
-                                    onChange={(event) =>
-                                        setTaskForm((current) => ({
-                                            ...current,
-                                            assignedTo: event.target.value,
-                                        }))
-                                    }
+                                    onChange={updateTaskForm}
                                     className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
                                     style={{
                                         background: "var(--surface)",
@@ -997,10 +1220,9 @@ export default function Tasks() {
                                     }}
                                 >
                                     <option value="">Unassigned</option>
-
                                     {workspaceMembers.map((member) => (
                                         <option key={member._id} value={member._id}>
-                                            {member.fullName}
+                                            {member.name}
                                         </option>
                                     ))}
                                 </select>
@@ -1008,22 +1230,14 @@ export default function Tasks() {
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label
-                                        htmlFor="task-priority"
-                                        className="text-sm font-medium"
-                                    >
+                                    <label htmlFor="task-priority" className="text-sm font-medium">
                                         Priority
                                     </label>
-
                                     <select
                                         id="task-priority"
+                                        name="priority"
                                         value={taskForm.priority}
-                                        onChange={(event) =>
-                                            setTaskForm((current) => ({
-                                                ...current,
-                                                priority: event.target.value,
-                                            }))
-                                        }
+                                        onChange={updateTaskForm}
                                         className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
                                         style={{
                                             background: "var(--surface)",
@@ -1038,23 +1252,15 @@ export default function Tasks() {
                                 </div>
 
                                 <div>
-                                    <label
-                                        htmlFor="task-due-date"
-                                        className="text-sm font-medium"
-                                    >
+                                    <label htmlFor="task-due-date" className="text-sm font-medium">
                                         Due date
                                     </label>
-
                                     <input
                                         id="task-due-date"
+                                        name="dueDate"
                                         type="date"
                                         value={taskForm.dueDate}
-                                        onChange={(event) =>
-                                            setTaskForm((current) => ({
-                                                ...current,
-                                                dueDate: event.target.value,
-                                            }))
-                                        }
+                                        onChange={updateTaskForm}
                                         className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
                                         style={{
                                             background: "var(--surface)",
@@ -1070,11 +1276,8 @@ export default function Tasks() {
                                     type="button"
                                     onClick={() => setCreateOpen(false)}
                                     disabled={creatingTask}
-                                    className="h-10 rounded-lg border px-4 text-sm font-medium disabled:opacity-50"
-                                    style={{
-                                        borderColor: "var(--border)",
-                                        color: "var(--text)",
-                                    }}
+                                    className="h-10 rounded-lg border px-4 text-sm font-medium"
+                                    style={{ borderColor: "var(--border)" }}
                                 >
                                     Cancel
                                 </button>
@@ -1087,7 +1290,7 @@ export default function Tasks() {
                                         !taskForm.title.trim() ||
                                         !taskForm.project
                                     }
-                                    className="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-60"
+                                    className="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-50"
                                     style={{ background: "var(--primary)" }}
                                 >
                                     <Plus size={16} />
