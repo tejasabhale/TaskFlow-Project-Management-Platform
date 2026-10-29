@@ -28,57 +28,61 @@ export default function Navbar() {
     document.documentElement.classList.toggle("dark", isDark);
 
     try {
-      localStorage.setItem(
-        "taskflow-theme",
-        isDark ? "dark" : "light",
-      );
+      localStorage.setItem("taskflow-theme", isDark ? "dark" : "light");
     } catch {
       // Theme switching still works if storage is unavailable.
     }
   }, [isDark]);
 
   const iconButtonClass =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg " +
-    "text-[var(--text-muted)] transition-colors " +
-    "hover:bg-[var(--surface-muted)] hover:text-[var(--text)] " +
-    "focus-visible:outline-2 focus-visible:outline-[var(--focus)]";
+    "inline-flex h-10 w-10 shrink-0 items-center justify-center " +
+    "border border-[var(--border)] text-[var(--text-muted)] " +
+    "transition-colors duration-200 " +
+    "hover:border-[var(--primary)] hover:bg-[var(--surface-muted)] " +
+    "hover:text-[var(--primary)] " +
+    "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+    "focus-visible:outline-[var(--focus)]";
 
   return (
     <header
-      className="sticky top-0 z-50 w-full border-b"
-      style={{
-        backgroundColor: "var(--surface)",
-        borderColor: "var(--border)",
-      }}
+      className="sticky top-0 z-50 w-full border-b border-[var(--border)] bg-[var(--surface)]"
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-[68px] max-w-7xl items-center justify-between gap-4 px-5 sm:h-[72px] sm:px-8 lg:px-12">
         {/* Brand */}
         <Link
           to="/"
           aria-label="TaskFlow home"
-          className="flex shrink-0 items-center gap-2.5 no-underline"
+          className="group flex min-w-0 shrink-0 items-center gap-3 no-underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
           style={{ color: "var(--text)" }}
         >
-          <CheckSquare
-            size={22}
-            strokeWidth={1.9}
-            className="text-[var(--primary)]"
-          />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--border)] bg-[var(--surface-muted)] transition-colors duration-200 group-hover:border-[var(--primary)] group-hover:bg-[var(--primary-soft)]">
+            <CheckSquare
+              size={21}
+              strokeWidth={1.8}
+              className="text-[var(--primary)]"
+            />
+          </span>
 
-          <span className="text-lg font-bold tracking-tight">
-            TaskFlow
+          <span className="flex min-w-0 flex-col">
+            <span className="font-['Plus_Jakarta_Sans',sans-serif] text-base font-bold tracking-[-0.035em] sm:text-lg">
+              TaskFlow
+            </span>
+
+            <span className="mt-0.5 hidden text-[9px] font-mono uppercase tracking-[0.14em] text-[var(--text-subtle)] sm:block">
+              Plan with purpose
+            </span>
           </span>
         </Link>
 
-        {/* Authentication and Theme Actions */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Authentication and theme actions */}
+        <nav
+          aria-label="Account navigation"
+          className="flex shrink-0 items-center gap-2 sm:gap-3"
+        >
           {/* Sign In */}
           <Link
             to="/login"
-            className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-sm font-medium no-underline transition-colors hover:bg-[var(--surface-muted)] focus-visible:outline-2 focus-visible:outline-[var(--focus)] sm:px-4"
-            style={{
-              color: "var(--text)",
-            }}
+            className="inline-flex h-10 items-center justify-center px-3 text-xs font-semibold text-[var(--text)] no-underline transition-colors duration-200 hover:text-[var(--primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] sm:px-4 sm:text-sm"
           >
             Sign In
           </Link>
@@ -86,13 +90,27 @@ export default function Navbar() {
           {/* Sign Up */}
           <Link
             to="/register"
-            className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-sm font-semibold no-underline transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-[var(--focus)] sm:px-4"
+            className="group inline-flex h-10 items-center justify-center gap-2 border border-[var(--primary)] px-3 text-xs font-semibold no-underline transition-colors duration-200 hover:border-[var(--primary-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] sm:gap-3 sm:px-5 sm:text-sm"
             style={{
               backgroundColor: "var(--primary)",
-              color: "#ffffff",
+              color: "var(--text-inverse)",
+            }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.backgroundColor =
+                "var(--primary-hover)";
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.backgroundColor = "var(--primary)";
             }}
           >
             Sign Up
+
+            <span
+              aria-hidden="true"
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
+            >
+              ↗
+            </span>
           </Link>
 
           {/* Theme Toggle */}
@@ -102,6 +120,7 @@ export default function Navbar() {
             aria-label={
               isDark ? "Switch to light mode" : "Switch to dark mode"
             }
+            aria-pressed={isDark}
             title={isDark ? "Light mode" : "Dark mode"}
             className={iconButtonClass}
           >
@@ -111,7 +130,7 @@ export default function Navbar() {
               <Moon size={18} strokeWidth={1.8} />
             )}
           </button>
-        </div>
+        </nav>
       </div>
     </header>
   );
