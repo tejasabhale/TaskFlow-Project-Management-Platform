@@ -4,17 +4,21 @@ import AppTopbar from "../components/dashboard/AppTopbar";
 
 export default function DashboardLayout() {
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 md:flex-row">
+    <div className="flex h-screen overflow-hidden bg-[var(--surface-muted)] text-[var(--text)]">
       {/* Sidebar */}
       <Sidebar />
 
-      {/* Main Area */}
+      {/* Main area: topbar stays fixed, only the content scrolls */}
       <div className="flex min-w-0 flex-1 flex-col">
         <AppTopbar />
 
-        {/* Selected Page Renders Here */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <Outlet />
+        <main
+          id="main-content"
+          className="flex-1 overflow-y-auto overscroll-contain scroll-smooth"
+        >
+          <div className="mx-auto w-full max-w-7xl">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

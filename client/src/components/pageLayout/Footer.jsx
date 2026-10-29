@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -51,14 +52,14 @@ export default function Footer() {
   };
 
   const reveal = (delay = 0) => ({
-    initial: prefersReducedMotion ? false : { opacity: 0, y: 18 },
+    initial: prefersReducedMotion ? false : { opacity: 0, y: 16 },
     whileInView: prefersReducedMotion ? undefined : { opacity: 1, y: 0 },
     viewport: {
       once: false,
       amount: 0.15,
     },
     transition: {
-      duration: 0.55,
+      duration: 0.5,
       delay,
       ease: [0.22, 1, 0.36, 1],
     },
@@ -66,46 +67,53 @@ export default function Footer() {
 
   return (
     <footer className="relative isolate mt-auto overflow-hidden border-t border-[var(--border)] bg-[var(--background)] text-[var(--text)]">
-      {/* Background pattern */}
+      {/* Subtle editorial background */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 opacity-30"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-25"
         style={{
           backgroundImage:
-            "radial-gradient(var(--border-strong) 0.8px, transparent 0.8px)",
-          backgroundSize: "24px 24px",
-          maskImage: "linear-gradient(to bottom, black, transparent 90%)",
+            "radial-gradient(var(--border-strong) 0.7px, transparent 0.8px)",
+          backgroundSize: "28px 28px",
+          maskImage: "linear-gradient(to bottom, black, transparent 85%)",
         }}
       />
 
-      {/* Soft theme-colored glow */}
+      {/* Restrained theme accent */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-80 w-[600px] max-w-full -translate-x-1/2 rounded-full blur-3xl"
+        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-80 w-[600px] max-w-full -translate-x-1/2"
         style={{
           background:
-            "radial-gradient(ellipse, color-mix(in srgb, var(--primary) 10%, transparent), transparent 70%)",
+            "radial-gradient(ellipse, color-mix(in srgb, var(--primary) 7%, transparent), transparent 70%)",
         }}
       />
 
-      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-12">
         {/* Main footer */}
-        <div className="grid gap-12 py-14 sm:py-16 lg:grid-cols-[1.5fr_1fr_1fr] lg:gap-16 lg:py-20">
+        <div className="grid gap-10 py-14 sm:grid-cols-2 sm:gap-x-10 sm:gap-y-12 sm:py-16 lg:grid-cols-12 lg:gap-8 lg:py-20">
           {/* Brand and description */}
-          <motion.div {...reveal()}>
+          <motion.div
+            {...reveal()}
+            className="min-w-0 sm:col-span-2 lg:col-span-5"
+          >
             <Link
               to="/"
               aria-label="TaskFlow home"
-              className="inline-flex items-center gap-2.5"
+              className="group inline-flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
               style={{ color: "var(--text)" }}
             >
-              <CheckSquare
-                size={23}
-                strokeWidth={1.9}
-                className="text-[var(--primary)]"
-              />
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center border border-[var(--border)] bg-[var(--surface)] transition-colors duration-200 group-hover:border-[var(--primary)] group-hover:bg-[var(--primary-soft)]">
+                <CheckSquare
+                  size={22}
+                  strokeWidth={1.8}
+                  className="text-[var(--primary)]"
+                />
+              </span>
 
-              <span className="text-xl font-bold tracking-tight">TaskFlow</span>
+              <span className="text-xl font-bold tracking-[-0.04em]">
+                TaskFlow
+              </span>
             </Link>
 
             <p className="mt-5 max-w-sm text-sm leading-7 text-[var(--text-muted)]">
@@ -114,18 +122,19 @@ export default function Footer() {
             </p>
 
             {/* Product capabilities */}
-            <div className="mt-6 flex flex-col gap-3">
+            <div className="mt-7 flex max-w-sm flex-col border-t border-[var(--border)] pt-4">
               {footerFeatures.map(({ label, Icon }) => (
                 <div
                   key={label}
-                  className="flex items-center gap-2.5 text-xs text-[var(--text-subtle)] sm:text-sm"
+                  className="flex min-h-10 items-center gap-3 border-b border-[var(--border)] py-2.5 text-xs text-[var(--text-muted)] last:border-b-0 sm:text-sm"
                 >
                   <Icon
-                    size={15}
-                    strokeWidth={1.8}
+                    size={16}
+                    strokeWidth={1.7}
                     className="shrink-0 text-[var(--primary)]"
                   />
-                  {label}
+
+                  <span>{label}</span>
                 </div>
               ))}
             </div>
@@ -133,25 +142,35 @@ export default function Footer() {
 
           {/* Navigation columns */}
           {Object.entries(footerLinks).map(([heading, links], index) => (
-            <motion.div key={heading} {...reveal((index + 1) * 0.08)}>
-              <h2 className="mb-5 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--text-subtle)]">
+            <motion.div
+              key={heading}
+              {...reveal((index + 1) * 0.08)}
+              className={`min-w-0 ${
+                index === 0
+                  ? "lg:col-span-3 lg:col-start-7"
+                  : "lg:col-span-3 lg:col-start-10"
+              }`}
+            >
+              <h2 className="mb-6 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)] sm:text-[11px]">
+                <span className="h-1.5 w-1.5 bg-[var(--primary)]" />
                 {heading}
               </h2>
 
               <nav
                 aria-label={`${heading} links`}
-                className="flex flex-col items-start gap-4"
+                className="flex flex-col items-start"
               >
                 {links.map(({ label, to }) => (
                   <Link
                     key={label}
                     to={to}
-                    className="group inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition-colors duration-200 hover:text-[var(--primary)]"
+                    className="group flex min-h-11 w-full items-center justify-between gap-3 border-b border-[var(--border)] py-3 text-sm text-[var(--text-muted)] transition-colors duration-200 last:border-b-0 hover:text-[var(--primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
                   >
-                    {label}
+                    <span>{label}</span>
+
                     <ArrowRight
-                      size={13}
-                      className="opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                      size={14}
+                      className="shrink-0 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100"
                     />
                   </Link>
                 ))}
@@ -169,7 +188,7 @@ export default function Footer() {
             © {new Date().getFullYear()} TaskFlow. Built for better work.
           </p>
 
-          <div className="flex items-center justify-between gap-5 sm:justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-5 sm:justify-end">
             <span className="text-xs text-[var(--text-subtle)]">
               Plan less. Achieve more.
             </span>
@@ -177,10 +196,14 @@ export default function Footer() {
             <button
               type="button"
               onClick={scrollToTop}
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-xs font-medium text-[var(--text-muted)] transition-colors duration-200 hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--primary)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
+              className="group inline-flex min-h-10 shrink-0 items-center gap-3 border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-medium text-[var(--text-muted)] transition-colors duration-200 hover:border-[var(--primary)] hover:text-[var(--primary)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
             >
               Back to top
-              <ArrowUp size={14} />
+
+              <ArrowUp
+                size={14}
+                className="transition-transform duration-200 group-hover:-translate-y-0.5"
+              />
             </button>
           </div>
         </motion.div>
