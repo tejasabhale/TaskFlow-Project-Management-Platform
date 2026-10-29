@@ -8,38 +8,34 @@ gsap.registerPlugin(ScrollTrigger);
 
 export default function SmoothScroll() {
   useEffect(() => {
-    // Let ScrollToTop control the page position on reload and route changes.
     if ("scrollRestoration" in window.history) {
       window.history.scrollRestoration = "manual";
     }
-
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    if (reduceMotion) return undefined;
 
     const lenis = new Lenis({
       lerp: 0.08,
       smoothWheel: true,
       anchors: true,
+      allowNestedScroll: true,
     });
 
-    // Expose the instance so ScrollToTop can scroll immediately through Lenis.
     window.lenis = lenis;
 
-    const handleScroll = () => ScrollTrigger.update();
-    lenis.on("scroll", handleScroll);
+    const updateScrollTrigger = () => {
+      ScrollTrigger.update();
+    };
 
     const updateLenis = (time) => {
       lenis.raf(time * 1000);
     };
 
+    lenis.on("scroll", updateScrollTrigger);
+
     gsap.ticker.add(updateLenis);
     gsap.ticker.lagSmoothing(0);
 
     return () => {
-      lenis.off("scroll", handleScroll);
+      lenis.off("scroll", updateScrollTrigger);
       gsap.ticker.remove(updateLenis);
 
       if (window.lenis === lenis) {

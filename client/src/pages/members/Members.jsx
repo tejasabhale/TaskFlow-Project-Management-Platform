@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { RefreshCw, Users, UserPlus, Search } from "lucide-react";
 import { useWorkspace } from "../../context/WorkspaceContext.jsx";
 
@@ -8,18 +9,27 @@ const API_URL =
 
 const getId = (value) => {
     if (!value) return "";
+
     if (typeof value === "object") {
         return String(value._id || value.id || value.userId || "");
     }
+
     return String(value);
 };
 
-const getMemberUser = (member) => member?.user || member?.member || member;
+const getMemberUser = (member) =>
+    member?.user || member?.member || member;
 
 const getMemberName = (member) =>
-    member?.fullName || member?.name || member?.userName || member?.username || "Unnamed member";
+    member?.fullName ||
+    member?.name ||
+    member?.userName ||
+    member?.username ||
+    "Unnamed member";
 
 export default function Members() {
+    const navigate = useNavigate();
+
     const {
         workspaces,
         currentWorkspace,
@@ -74,9 +84,22 @@ export default function Members() {
 
         try {
             await refreshWorkspaces();
+        } catch (err) {
+            setError(err.message || "Unable to refresh workspace members.");
         } finally {
             setRefreshing(false);
         }
+    };
+
+    const handleViewMember = (member) => {
+        const memberId = getId(member);
+
+        if (!memberId) {
+            setError("Member ID is unavailable. Unable to open the profile.");
+            return;
+        }
+
+        navigate(`/dashboard/members/${encodeURIComponent(memberId)}`);
     };
 
     const handleAddMember = async (event) => {
@@ -90,7 +113,9 @@ export default function Members() {
         }
 
         if (!canManageMembers) {
-            setError("Only the workspace owner or an admin can add members.");
+            setError(
+                "Only the workspace owner or an admin can add members."
+            );
             return;
         }
 
@@ -114,7 +139,9 @@ export default function Members() {
                     credentials: "include",
                     headers: {
                         "Content-Type": "application/json",
-                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        ...(token
+                            ? { Authorization: `Bearer ${token}` }
+                            : {}),
                     },
                     body: JSON.stringify({
                         email: email.trim(),
@@ -127,7 +154,9 @@ export default function Members() {
 
             if (!response.ok) {
                 throw new Error(
-                    result.message || result.error || "Unable to add member."
+                    result.message ||
+                    result.error ||
+                    "Unable to add member."
                 );
             }
 
@@ -146,7 +175,10 @@ export default function Members() {
 
     if (loading) {
         return (
-            <div className="p-6 text-sm" style={{ color: "var(--text-muted)" }}>
+            <div
+                className="p-6 text-sm"
+                style={{ color: "var(--text-muted)" }}
+            >
                 Loading members...
             </div>
         );
@@ -156,8 +188,14 @@ export default function Members() {
         <div className="space-y-6 p-4 sm:p-6" style={{ color: "var(--text)" }}>
             <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-                    <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        Members
+                    </h1>
+
+                    <p
+                        className="mt-1 text-sm"
+                        style={{ color: "var(--text-muted)" }}
+                    >
                         Manage people in your workspace.
                     </p>
                 </div>
@@ -166,7 +204,9 @@ export default function Members() {
                     <select
                         aria-label="Select workspace"
                         value={currentWorkspaceId || ""}
-                        onChange={(event) => setCurrentWorkspace(event.target.value)}
+                        onChange={(event) =>
+                            setCurrentWorkspace(event.target.value)
+                        }
                         className="rounded-lg border px-3 py-2 text-sm outline-none"
                         style={{
                             color: "var(--text)",
@@ -175,7 +215,10 @@ export default function Members() {
                         }}
                     >
                         {workspaces.map((workspace) => (
-                            <option key={getId(workspace)} value={getId(workspace)}>
+                            <option
+                                key={getId(workspace)}
+                                value={getId(workspace)}
+                            >
                                 {workspace.name}
                             </option>
                         ))}
@@ -192,7 +235,10 @@ export default function Members() {
                             borderColor: "var(--border)",
                         }}
                     >
-                        <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+                        <RefreshCw
+                            size={15}
+                            className={refreshing ? "animate-spin" : ""}
+                        />
                         Refresh
                     </button>
 
@@ -258,22 +304,35 @@ export default function Members() {
                     }}
                 >
                     <div>
-                        <h2 className="text-lg font-semibold">Add a workspace member</h2>
-                        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-                            Enter the email address of an existing TaskFlow user.
+                        <h2 className="text-lg font-semibold">
+                            Add a workspace member
+                        </h2>
+
+                        <p
+                            className="mt-1 text-sm"
+                            style={{ color: "var(--text-muted)" }}
+                        >
+                            Enter the email address of an existing TaskFlow
+                            user.
                         </p>
                     </div>
 
                     <div className="space-y-1.5">
-                        <label htmlFor="member-email" className="block text-sm font-medium">
+                        <label
+                            htmlFor="member-email"
+                            className="block text-sm font-medium"
+                        >
                             Email address
                         </label>
+
                         <input
                             id="member-email"
                             type="email"
                             required
                             value={email}
-                            onChange={(event) => setEmail(event.target.value)}
+                            onChange={(event) =>
+                                setEmail(event.target.value)
+                            }
                             placeholder="member@example.com"
                             className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
                             style={{
@@ -285,9 +344,13 @@ export default function Members() {
                     </div>
 
                     <div className="space-y-1.5">
-                        <label htmlFor="member-role" className="block text-sm font-medium">
+                        <label
+                            htmlFor="member-role"
+                            className="block text-sm font-medium"
+                        >
                             Workspace role
                         </label>
+
                         <select
                             id="member-role"
                             value={role}
@@ -300,7 +363,9 @@ export default function Members() {
                             }}
                         >
                             <option value="member">Member</option>
-                            {isOwner && <option value="admin">Admin</option>}
+                            {isOwner && (
+                                <option value="admin">Admin</option>
+                            )}
                         </select>
                     </div>
 
@@ -322,15 +387,21 @@ export default function Members() {
                     borderColor: "var(--border)",
                 }}
             >
-                <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between"
+                <div
+                    className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between"
                     style={{ borderColor: "var(--border)" }}
                 >
                     <div>
                         <h2 className="font-semibold">
                             {currentWorkspace?.name || "Workspace members"}
                         </h2>
-                        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-                            {members.length} {members.length === 1 ? "member" : "members"}
+
+                        <p
+                            className="mt-1 text-sm"
+                            style={{ color: "var(--text-muted)" }}
+                        >
+                            {members.length}{" "}
+                            {members.length === 1 ? "member" : "members"}
                         </p>
                     </div>
 
@@ -340,11 +411,13 @@ export default function Members() {
                             className="absolute left-3 top-1/2 -translate-y-1/2"
                             style={{ color: "var(--text-muted)" }}
                         />
+
                         <input
                             type="search"
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search members..."
+                            aria-label="Search members"
                             className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm outline-none"
                             style={{
                                 background: "var(--surface)",
@@ -356,13 +429,24 @@ export default function Members() {
                 </div>
 
                 {!currentWorkspace ? (
-                    <div className="p-10 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                    <div
+                        className="p-10 text-center text-sm"
+                        style={{ color: "var(--text-muted)" }}
+                    >
                         No workspace found. Create or join a workspace first.
                     </div>
                 ) : filteredMembers.length === 0 ? (
                     <div className="p-10 text-center">
-                        <Users size={26} className="mx-auto" style={{ color: "var(--text-muted)" }} />
-                        <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
+                        <Users
+                            size={26}
+                            className="mx-auto"
+                            style={{ color: "var(--text-muted)" }}
+                        />
+
+                        <p
+                            className="mt-3 text-sm"
+                            style={{ color: "var(--text-muted)" }}
+                        >
                             {members.length === 0
                                 ? "No members are listed in this workspace yet."
                                 : "No members match your search."}
@@ -379,46 +463,94 @@ export default function Members() {
                                         borderColor: "var(--border)",
                                     }}
                                 >
-                                    <th className="px-4 py-3 font-medium">Member</th>
-                                    <th className="px-4 py-3 font-medium">Email</th>
-                                    <th className="px-4 py-3 font-medium">Role</th>
+                                    <th className="px-4 py-3 font-medium">
+                                        Member
+                                    </th>
+                                    <th className="px-4 py-3 font-medium">
+                                        Email
+                                    </th>
+                                    <th className="px-4 py-3 font-medium">
+                                        Role
+                                    </th>
                                 </tr>
                             </thead>
+
                             <tbody>
                                 {filteredMembers.map((item, index) => {
                                     const member = getMemberUser(item);
+                                    const memberId = getId(member);
                                     const memberRole = item?.role || "member";
                                     const name = getMemberName(member);
+                                    const initials =
+                                        name.charAt(0).toUpperCase();
 
                                     return (
                                         <tr
-                                            key={getId(member) || index}
+                                            key={memberId || index}
                                             className="border-b last:border-b-0"
-                                            style={{ borderColor: "var(--border)" }}
+                                            style={{
+                                                borderColor: "var(--border)",
+                                            }}
                                         >
                                             <td className="px-4 py-4">
-                                                <div className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleViewMember(member)
+                                                    }
+                                                    disabled={!memberId}
+                                                    aria-label={`View details for ${name}`}
+                                                    className="group flex items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-teal-600 disabled:cursor-default"
+                                                >
                                                     <div
-                                                        className="flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                                                        className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold"
                                                         style={{
                                                             color: "var(--primary)",
-                                                            background: "var(--primary-soft)",
+                                                            background:
+                                                                "var(--primary-soft)",
                                                         }}
                                                     >
-                                                        {name.charAt(0).toUpperCase()}
+                                                        {member?.avatar?.url ? (
+                                                            <img
+                                                                src={member.avatar.url}
+                                                                alt=""
+                                                                className="h-full w-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            initials
+                                                        )}
                                                     </div>
-                                                    <span className="font-medium">{name}</span>
-                                                </div>
+
+                                                    <span
+                                                        className={`font-medium ${memberId
+                                                                ? "group-hover:underline group-hover:underline-offset-4"
+                                                                : ""
+                                                            }`}
+                                                        style={{
+                                                            color: "var(--text)",
+                                                        }}
+                                                    >
+                                                        {name}
+                                                    </span>
+                                                </button>
                                             </td>
-                                            <td className="px-4 py-4" style={{ color: "var(--text-muted)" }}>
+
+                                            <td
+                                                className="px-4 py-4"
+                                                style={{
+                                                    color: "var(--text-muted)",
+                                                }}
+                                            >
                                                 {member?.email || "—"}
                                             </td>
+
                                             <td className="px-4 py-4">
                                                 <span
                                                     className="rounded-full px-2.5 py-1 text-xs font-medium capitalize"
                                                     style={{
                                                         color: "var(--text)",
-                                                        background: "var(--surface-muted)",
+                                                        background:
+                                                            "var(--surface-muted)",
                                                     }}
                                                 >
                                                     {memberRole}

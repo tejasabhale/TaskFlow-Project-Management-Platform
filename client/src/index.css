@@ -1,5 +1,3 @@
-/* index.css */
-
 /* ================================
    Typography — Manrope
 ================================ */
@@ -135,7 +133,10 @@
 
 html {
   min-width: 320px;
-  scroll-behavior: smooth;
+
+  /* Lenis controls smooth scrolling */
+  scroll-behavior: auto;
+
   scrollbar-gutter: stable;
 }
 
@@ -165,7 +166,56 @@ body {
     color 0.2s ease;
 }
 
-/* Apply Manrope consistently to form controls */
+/* Allow the React application to grow naturally */
+
+#root {
+  min-height: 100vh;
+}
+
+/* ================================
+   Lenis Smooth Scrolling
+================================ */
+
+/* Let the document calculate its natural height */
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+/* Prevent native smooth scrolling from conflicting with Lenis */
+
+html.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+/* Also handle smooth scrolling on the body */
+
+html.lenis.lenis-smooth body {
+  scroll-behavior: auto !important;
+}
+
+/* Allow designated nested scroll containers to scroll */
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+/* Prevent scrolling while Lenis is intentionally stopped */
+
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+/* Avoid iframe interaction blocking Lenis scrolling */
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* ================================
+   Form Elements
+================================ */
 
 button,
 input,
@@ -218,7 +268,7 @@ p {
 }
 
 /* ================================
-   Form Elements
+   Form Controls
 ================================ */
 
 input,
@@ -245,6 +295,7 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--focus);
+
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
 }
 
@@ -463,7 +514,7 @@ button,
   transform: translateY(0);
 }
 
-/* Staggered Entrance */
+/* Staggered entrance */
 
 .mobile-menu-shell.is-open .mobile-nav-item[data-index="0"] {
   transition-delay: 0ms;
@@ -538,7 +589,7 @@ button,
   outline-offset: 2px;
 }
 
-/* Respect Reduced-Motion Preferences */
+/* Respect reduced-motion preferences */
 
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -33,3 +33,37 @@ export const deleteTask = async (taskId) => {
 
   return response.data;
 };
+
+// Upload a single attachment.
+export const uploadTaskAttachment = async (taskId, file) => {
+  if (!(file instanceof File)) {
+    throw new Error("Please select a valid file.");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+
+  const response = await api.post(
+    `/tasks/${encodeURIComponent(taskId)}/attachments`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+
+  return response.data;
+};
+
+// Remove an attachment using its Cloudinary public ID.
+export const deleteTaskAttachment = async (taskId, attachmentId) => {
+  const response = await api.delete(
+    `/tasks/${encodeURIComponent(taskId)}/attachments`,
+    {
+      data: { attachmentId },
+    },
+  );
+
+  return response.data;
+};

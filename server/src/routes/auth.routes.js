@@ -24,7 +24,8 @@ import {
 const router = Router();
 
 // Registration and email verification
-router.post("/register", authRateLimiter, register);
+// router.post("/register", authRateLimiter, register);
+router.post("/register", register);
 router.post("/verify-otp", authRateLimiter, verifyOtp);
 router.post("/resend-otp", authRateLimiter, resendOtp);
 
