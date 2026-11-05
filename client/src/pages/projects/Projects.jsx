@@ -288,11 +288,11 @@ export default function Projects() {
 
     return (
         <div
-            className="mx-auto max-w-7xl space-y-6"
+            className="mx-auto w-full max-w-7xl min-w-0 space-y-6 px-4 py-6 sm:space-y-7 sm:px-6 sm:py-8 lg:px-8 lg:py-9"
             style={{ color: "var(--text)" }}
         >
             {/* Page heading */}
-            <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <section className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <h2 className="text-2xl font-semibold tracking-tight">
                         Projects
@@ -306,7 +306,7 @@ export default function Projects() {
                     </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
                     <span
                         className="text-sm"
                         style={{ color: "var(--text-muted)" }}
@@ -373,7 +373,7 @@ export default function Projects() {
             {error && (
                 <div
                     role="alert"
-                    className="flex gap-3 rounded-lg border p-4 text-sm"
+                    className="flex min-w-0 gap-3 rounded-lg border p-4 text-sm"
                     style={{
                         borderColor: "#dc7777",
                         background: "var(--surface)",
@@ -381,13 +381,13 @@ export default function Projects() {
                     }}
                 >
                     <AlertCircle size={18} className="shrink-0" />
-                    <span>{error}</span>
+                    <span className="min-w-0 break-words">{error}</span>
                 </div>
             )}
 
             {/* Workspace selector and filters */}
             <section
-                className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row"
+                className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-[minmax(220px,0.9fr)_minmax(0,2fr)_minmax(170px,0.8fr)]"
                 style={{
                     background: "var(--surface)",
                     borderColor: "var(--border)",
@@ -400,7 +400,7 @@ export default function Projects() {
                         setCurrentWorkspace(event.target.value)
                     }
                     disabled={loadingWorkspaces || workspaces.length === 0}
-                    className="w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none sm:max-w-xs"
+                    className="w-full min-w-0 rounded-lg border px-3.5 py-2.5 text-sm outline-none"
                     style={{
                         background: "var(--surface)",
                         borderColor: "var(--border)",
@@ -435,7 +435,7 @@ export default function Projects() {
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder="Search projects..."
-                        className="w-full rounded-lg border py-2.5 pl-10 pr-4 text-sm outline-none"
+                        className="w-full min-w-0 rounded-lg border py-2.5 pl-10 pr-4 text-sm outline-none"
                         style={{
                             background: "var(--surface)",
                             borderColor: "var(--border)",
@@ -448,7 +448,7 @@ export default function Projects() {
                     aria-label="Filter projects by status"
                     value={statusFilter}
                     onChange={(event) => setStatusFilter(event.target.value)}
-                    className="rounded-lg border px-3.5 py-2.5 text-sm outline-none"
+                    className="w-full min-w-0 rounded-lg border px-3.5 py-2.5 text-sm outline-none"
                     style={{
                         background: "var(--surface)",
                         borderColor: "var(--border)",
@@ -533,16 +533,17 @@ export default function Projects() {
                     )}
                 </div>
             ) : (
-                <section className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
+                <section className="grid min-w-0 grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2 2xl:grid-cols-3">
                     {filteredProjects.map((project) => {
                         const startDate = formatDate(project.startDate);
                         const endDate = formatDate(project.endDate);
-                        const detailsPath = `/dashboard/projects/${project._id}`;
+                        const projectId = getId(project);
+                        const detailsPath = `/dashboard/projects/${projectId}`;
 
                         return (
                             <article
-                                key={project._id}
-                                className="flex min-w-0 flex-col rounded-xl border p-5 transition-colors hover:border-[var(--primary)]"
+                                key={projectId}
+                                className="flex h-full min-w-0 flex-col rounded-xl border p-4 transition-colors hover:border-[var(--primary)] sm:p-5"
                                 style={{
                                     background: "var(--surface)",
                                     borderColor: "var(--border)",
@@ -597,7 +598,7 @@ export default function Projects() {
                                     </h3>
 
                                     <p
-                                        className="mt-2 min-h-10 break-words text-sm leading-6"
+                                        className="mt-2 min-h-12 break-words text-sm leading-6 [overflow-wrap:anywhere]"
                                         style={{ color: "var(--text-muted)" }}
                                     >
                                         {project.description || "No description provided."}
@@ -643,7 +644,7 @@ export default function Projects() {
 
                                 {/* Dates */}
                                 <div
-                                    className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4 text-xs"
+                                    className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4 text-xs"
                                     style={{
                                         borderColor: "var(--border)",
                                         color: "var(--text-muted)",
@@ -709,7 +710,7 @@ export default function Projects() {
             {/* Create project dialog */}
             {createOpen && (
                 <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6"
+                    className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-4 sm:items-center sm:px-4 sm:py-6"
                     onMouseDown={(event) => {
                         if (
                             event.target === event.currentTarget &&
@@ -723,7 +724,7 @@ export default function Projects() {
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="create-project-title"
-                        className="my-auto w-full max-w-lg rounded-2xl border p-6"
+                        className="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border p-5 shadow-xl sm:max-h-[calc(100dvh-3rem)] sm:p-6"
                         style={{
                             background: "var(--surface)",
                             color: "var(--text)",
@@ -808,7 +809,7 @@ export default function Projects() {
                                         }))
                                     }
                                     placeholder="e.g. Website Redesign"
-                                    className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
+                                    className="mt-2 w-full min-w-0 rounded-lg border px-3.5 py-3 text-sm outline-none"
                                     style={{
                                         background: "var(--surface)",
                                         color: "var(--text)",
@@ -836,7 +837,7 @@ export default function Projects() {
                                         }))
                                     }
                                     placeholder="Describe the project."
-                                    className="mt-2 w-full resize-y rounded-lg border px-3.5 py-3 text-sm outline-none"
+                                    className="mt-2 w-full min-w-0 resize-y rounded-lg border px-3.5 py-3 text-sm outline-none"
                                     style={{
                                         background: "var(--surface)",
                                         color: "var(--text)",
@@ -862,7 +863,7 @@ export default function Projects() {
                                             status: event.target.value,
                                         }))
                                     }
-                                    className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
+                                    className="mt-2 w-full min-w-0 rounded-lg border px-3.5 py-3 text-sm outline-none"
                                     style={{
                                         background: "var(--surface)",
                                         color: "var(--text)",
@@ -877,7 +878,7 @@ export default function Projects() {
                                 </select>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label
                                         htmlFor="project-start"
@@ -896,7 +897,7 @@ export default function Projects() {
                                                 startDate: event.target.value,
                                             }))
                                         }
-                                        className="mt-2 w-full rounded-lg border px-3 py-3 text-sm outline-none"
+                                        className="mt-2 w-full min-w-0 rounded-lg border px-3 py-3 text-sm outline-none"
                                         style={{
                                             background: "var(--surface)",
                                             color: "var(--text)",
@@ -924,7 +925,7 @@ export default function Projects() {
                                                 endDate: event.target.value,
                                             }))
                                         }
-                                        className="mt-2 w-full rounded-lg border px-3 py-3 text-sm outline-none"
+                                        className="mt-2 w-full min-w-0 rounded-lg border px-3 py-3 text-sm outline-none"
                                         style={{
                                             background: "var(--surface)",
                                             color: "var(--text)",
@@ -934,12 +935,12 @@ export default function Projects() {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-3">
+                            <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end sm:gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setCreateOpen(false)}
                                     disabled={creatingProject}
-                                    className="h-10 rounded-lg border px-4 text-sm font-medium disabled:opacity-50"
+                                    className="h-10 w-full rounded-lg border px-4 text-sm font-medium disabled:opacity-50 sm:w-auto"
                                     style={{
                                         borderColor: "var(--border)",
                                         color: "var(--text)",
@@ -955,7 +956,7 @@ export default function Projects() {
                                         !projectForm.name.trim() ||
                                         !workspaceId
                                     }
-                                    className="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-60"
+                                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
                                     style={{ background: "var(--primary)" }}
                                 >
                                     <Plus size={16} />

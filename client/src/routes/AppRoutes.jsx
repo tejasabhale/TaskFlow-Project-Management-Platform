@@ -18,6 +18,7 @@ import TaskDetails from "../pages/tasks/TaskDetails";
 import ProjectDetails from "../pages/projects/ProjectDetails";
 import MemberDetails from "../pages/members/MemberDetails";
 import Profile from "../pages/profile/Profile";
+import ProtectedRoute from "./ProtectedRoute";
 
 const AppRoutes = ({ user, logout }) => {
   return (
@@ -31,15 +32,17 @@ const AppRoutes = ({ user, logout }) => {
       </Route>
 
       {/* Dashboard routes with a shared layout */}
-      <Route element={<DashboardLayout user={user} onLogout={logout} />}>
-        <Route path="/dashboard" element={<Overview />} />
-        <Route path="/dashboard/tasks" element={<Tasks />} />
-        <Route path="/dashboard/tasks/:taskId" element={<TaskDetails />} />
-        <Route path="/dashboard/projects" element={<Projects />} />
-        <Route path="/dashboard/projects/:projectId" element={<ProjectDetails />} />
-        <Route path="/dashboard/members" element={<Members />} />
-        <Route path="/dashboard/members/:userId" element={<MemberDetails />} />
-        <Route path="/dashboard/profile" element={<Profile />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout user={user} onLogout={logout} />}>
+          <Route path="/dashboard" element={<Overview />} />
+          <Route path="/dashboard/tasks" element={<Tasks />} />
+          <Route path="/dashboard/tasks/:taskId" element={<TaskDetails />} />
+          <Route path="/dashboard/projects" element={<Projects />} />
+          <Route path="/dashboard/projects/:projectId" element={<ProjectDetails />} />
+          <Route path="/dashboard/members" element={<Members />} />
+          <Route path="/dashboard/members/:userId" element={<MemberDetails />} />
+          <Route path="/dashboard/profile" element={<Profile />} />
+        </Route>
       </Route>
 
       {/* 404 Catch-All */}

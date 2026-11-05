@@ -1,77 +1,70 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+
 import {
-  RefreshCw,
-  ClipboardList,
-  FolderKanban,
-  CheckCircle2,
-  Clock3,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { Link } from "react-router-dom";
+import { gsap } from "gsap";
+import {
   AlertCircle,
+  ArrowRight,
   ArrowUpRight,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  FolderKanban,
+  Layers3,
+  ListTodo,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 import { useWorkspace } from "../../context/WorkspaceContext.jsx";
 import { getProjects } from "../../services/project.service.js";
 import { getTasks } from "../../services/task.service.js";
 
-const statusLabels = {
-  todo: "To Do",
-  inProgress: "In Progress",
-  review: "In Review",
-  completed: "Completed",
+const DISPLAY_FONT_ID = "login-display-font";
+const DISPLAY_FONT_URL =
+  "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
+
+const displayFont = {
+  fontFamily:
+    '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
 };
 
-const statusStyles = {
-  todo: {
-    background: "var(--surface-muted)",
-    color: "var(--text-muted)",
-  },
-  inProgress: {
-    background: "var(--primary-soft, #e1f2ef)",
-    color: "var(--primary)",
-  },
-  review: {
-    background: "#fff7ed",
-    color: "#c2410c",
-  },
-  completed: {
-    background: "#ecfdf5",
-    color: "#047857",
-  },
-};
+const taskLinkStyle = { color: "var(--text)" };
 
-const priorityColors = {
-  high: "#dc2626",
-  medium: "#d97706",
-  low: "var(--text-muted)",
-};
+const STATUSES = [
+  { key: "todo", label: "To do", color: "var(--text-subtle)" },
+  { key: "inProgress", label: "In progress", color: "var(--primary)" },
+  { key: "review", label: "In review", color: "var(--warning, #d97706)" },
+  { key: "completed", label: "Completed", color: "var(--success)" },
+];
+
+const STATUS_BY_KEY = Object.fromEntries(
+  STATUSES.map((status) => [status.key, status])
+);
 
 const getId = (value) => {
   if (!value) return "";
-
   if (typeof value === "object") {
     return String(value._id || value.id || "");
   }
-
   return String(value);
 };
 
-// Handles the API response envelope returned by your service functions.
 function getList(response, key) {
   let result = response;
 
   for (let depth = 0; depth < 5; depth += 1) {
-    if (Array.isArray(result)) {
-      return result;
-    }
-
-    if (!result || typeof result !== "object") {
-      return [];
-    }
-
-    if (key && Array.isArray(result[key])) {
-      return result[key];
-    }
+    if (Array.isArray(result)) return result;
+    if (!result || typeof result !== "object") return [];
+    if (key && Array.isArray(result[key])) return result[key];
 
     if (result.data !== undefined) {
       result = result.data;
@@ -88,10 +81,7 @@ const formatDate = (value) => {
   if (!value) return "No due date";
 
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "No due date";
-  }
+  if (Number.isNaN(date.getTime())) return "No due date";
 
   return new Intl.DateTimeFormat("en-IN", {
     month: "short",
@@ -101,15 +91,10 @@ const formatDate = (value) => {
 };
 
 const isOverdue = (task) => {
-  if (!task.dueDate || task.status === "completed") {
-    return false;
-  }
+  if (!task.dueDate || task.status === "completed") return false;
 
   const dueDate = new Date(task.dueDate);
-
-  if (Number.isNaN(dueDate.getTime())) {
-    return false;
-  }
+  if (Number.isNaN(dueDate.getTime())) return false;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -117,6 +102,290 @@ const isOverdue = (task) => {
 
   return dueDate < today;
 };
+
+const panelClass =
+  "rounded-2xl border border-[var(--border)] bg-[var(--surface)]";
+
+const getWorkspaceInitials = (name = "") =>
+  name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("") || "W";
+
+/* ---------------------------------------------------------------
+   Workspace Picker
+---------------------------------------------------------------- */
+
+function WorkspacePicker({ workspaces, selectedId, onSelect, loading }) {
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const listRef = useRef(null);
+  const optionRefs = useRef([]);
+
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const selectedIndex = workspaces.findIndex(
+    (workspace) => getId(workspace) === selectedId
+  );
+
+  const selectedWorkspace =
+    selectedIndex >= 0 ? workspaces[selectedIndex] : null;
+
+  const disabled = loading || workspaces.length === 0;
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open) listRef.current?.focus({ preventScroll: true });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    optionRefs.current[activeIndex]?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [activeIndex, open]);
+
+  const openMenu = (initialIndex = selectedIndex) => {
+    if (disabled) return;
+    setActiveIndex(Math.max(initialIndex, 0));
+    setOpen(true);
+  };
+
+  const closeMenu = (restoreFocus = false) => {
+    setOpen(false);
+    if (restoreFocus) triggerRef.current?.focus();
+  };
+
+  const chooseWorkspace = (workspace) => {
+    if (!workspace) return;
+    onSelect(getId(workspace));
+    closeMenu(true);
+  };
+
+  const handleTriggerKeyDown = (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      openMenu(Math.max(selectedIndex, 0));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      openMenu(selectedIndex >= 0 ? selectedIndex : workspaces.length - 1);
+    }
+  };
+
+  const handleListKeyDown = (event) => {
+    const lastIndex = workspaces.length - 1;
+
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        setActiveIndex((index) => Math.min(index + 1, lastIndex));
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        setActiveIndex((index) => Math.max(index - 1, 0));
+        break;
+      case "Home":
+        event.preventDefault();
+        setActiveIndex(0);
+        break;
+      case "End":
+        event.preventDefault();
+        setActiveIndex(lastIndex);
+        break;
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        chooseWorkspace(workspaces[activeIndex]);
+        break;
+      case "Escape":
+        event.preventDefault();
+        event.stopPropagation();
+        closeMenu(true);
+        break;
+      case "Tab":
+        closeMenu(false);
+        break;
+      default:
+        break;
+    }
+  };
+
+  return (
+    <div ref={rootRef} className="relative w-full min-w-0 sm:w-[280px]">
+      <label
+        htmlFor="overview-workspace-trigger"
+        className="mb-1.5 block px-0.5 text-xs font-medium text-[var(--text-muted)]"
+      >
+        Workspace
+      </label>
+
+      <button
+        ref={triggerRef}
+        id="overview-workspace-trigger"
+        type="button"
+        onClick={() => (open ? closeMenu() : openMenu())}
+        onKeyDown={handleTriggerKeyDown}
+        disabled={disabled}
+        aria-label="Select workspace"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls="overview-workspace-listbox"
+        className={`group flex min-h-12 w-full items-center gap-3 rounded-xl border bg-[var(--surface)] px-3 py-2 text-left outline-none transition-colors duration-150 hover:border-[var(--border-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-60 ${open
+            ? "border-[var(--primary)]"
+            : "border-[var(--border)]"
+          }`}
+      >
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+          <Layers3 size={17} strokeWidth={1.9} />
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-[var(--text)]">
+            {loading
+              ? "Loading workspaces..."
+              : selectedWorkspace?.name || "No workspaces available"}
+          </span>
+          <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">
+            {selectedWorkspace
+              ? "Currently selected"
+              : loading
+                ? "Please wait"
+                : "No workspace to select"}
+          </span>
+        </span>
+
+        <ChevronDown
+          size={16}
+          aria-hidden="true"
+          className={`shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${open ? "rotate-180 text-[var(--primary)]" : ""
+            }`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 text-[var(--text)] shadow-lg sm:w-[320px]">
+          <div className="flex items-center justify-between gap-3 px-2 pb-2.5 pt-1">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--text)]">
+                Switch workspace
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                Choose where you want to work
+              </p>
+            </div>
+
+            <span className="shrink-0 rounded-md bg-[var(--surface-muted)] px-2 py-1 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
+              {workspaces.length}{" "}
+              {workspaces.length === 1 ? "space" : "spaces"}
+            </span>
+          </div>
+
+          <div
+            ref={listRef}
+            id="overview-workspace-listbox"
+            role="listbox"
+            aria-label="Available workspaces"
+            aria-activedescendant={`overview-workspace-option-${activeIndex}`}
+            tabIndex={-1}
+            onKeyDown={handleListKeyDown}
+            className="max-h-64 space-y-1 overflow-y-auto overscroll-contain border-y border-[var(--border)] py-2 outline-none"
+          >
+            {workspaces.map((workspace, index) => {
+              const isSelected = getId(workspace) === selectedId;
+              const isActive = index === activeIndex;
+
+              return (
+                <button
+                  ref={(element) => {
+                    optionRefs.current[index] = element;
+                  }}
+                  id={`overview-workspace-option-${index}`}
+                  key={getId(workspace)}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  tabIndex={-1}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => chooseWorkspace(workspace)}
+                  className={`flex min-h-[54px] w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ${isSelected
+                      ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                      : isActive
+                        ? "bg-[var(--surface-muted)] text-[var(--text)]"
+                        : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                    }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold ${isSelected
+                        ? "bg-[var(--surface)] text-[var(--primary)]"
+                        : "bg-[var(--surface-muted)] text-[var(--text-muted)]"
+                      }`}
+                  >
+                    {getWorkspaceInitials(workspace.name)}
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">
+                      {workspace.name || "Untitled workspace"}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">
+                      {workspace.description ||
+                        (isSelected ? "Currently active" : "Switch workspace")}
+                    </span>
+                  </span>
+
+                  {isSelected && (
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--primary)]">
+                      <Check size={14} strokeWidth={2.5} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="px-2 pb-0.5 pt-2 text-[11px] leading-5 text-[var(--text-subtle)]">
+            Your tasks and projects update when you switch workspaces.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------
+   Overview Dashboard
+---------------------------------------------------------------- */
 
 export default function Overview() {
   const {
@@ -133,8 +402,23 @@ export default function Overview() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  const loadOverviewData = useCallback(
-    async (isRefresh = false) => {
+  const rootRef = useRef(null);
+  const requestRef = useRef(0);
+
+  useEffect(() => {
+    if (document.getElementById(DISPLAY_FONT_ID)) return;
+
+    const link = document.createElement("link");
+    link.id = DISPLAY_FONT_ID;
+    link.rel = "stylesheet";
+    link.href = DISPLAY_FONT_URL;
+    document.head.appendChild(link);
+  }, []);
+
+  const loadData = useCallback(
+    async (mode = "initial") => {
+      const requestId = ++requestRef.current;
+
       if (!currentWorkspaceId) {
         setProjects([]);
         setTasks([]);
@@ -144,9 +428,11 @@ export default function Overview() {
         return;
       }
 
-      if (isRefresh) {
+      if (mode === "refresh") {
         setRefreshing(true);
       } else {
+        setProjects([]);
+        setTasks([]);
         setLoadingData(true);
       }
 
@@ -154,122 +440,108 @@ export default function Overview() {
 
       try {
         const [projectResponse, taskResponse] = await Promise.all([
-          getProjects({
-            workspaceId: currentWorkspaceId,
-          }),
-          getTasks({
-            workspaceId: currentWorkspaceId,
-          }),
+          getProjects({ workspaceId: currentWorkspaceId }),
+          getTasks({ workspaceId: currentWorkspaceId }),
         ]);
+
+        if (requestId !== requestRef.current) return;
 
         setProjects(getList(projectResponse, "projects"));
         setTasks(getList(taskResponse, "tasks"));
       } catch (err) {
+        if (requestId !== requestRef.current) return;
+
         setError(
           err?.response?.data?.message ||
-            err?.message ||
-            "Unable to load workspace overview.",
+          err?.message ||
+          "Unable to load workspace overview."
         );
-
         setProjects([]);
         setTasks([]);
       } finally {
-        setLoadingData(false);
-        setRefreshing(false);
+        if (requestId === requestRef.current) {
+          setLoadingData(false);
+          setRefreshing(false);
+        }
       }
     },
-    [currentWorkspaceId],
+    [currentWorkspaceId]
   );
 
   useEffect(() => {
-    let active = true;
-
-    const fetchData = async () => {
-      if (!currentWorkspaceId) {
-        setProjects([]);
-        setTasks([]);
-        setLoadingData(false);
-        setRefreshing(false);
-        setError("");
-        return;
-      }
-
-      setProjects([]);
-      setTasks([]);
-      setLoadingData(true);
-      setError("");
-
-      try {
-        const [projectResponse, taskResponse] = await Promise.all([
-          getProjects({
-            workspaceId: currentWorkspaceId,
-          }),
-          getTasks({
-            workspaceId: currentWorkspaceId,
-          }),
-        ]);
-
-        if (!active) return;
-
-        setProjects(getList(projectResponse, "projects"));
-        setTasks(getList(taskResponse, "tasks"));
-      } catch (err) {
-        if (!active) return;
-
-        setError(
-          err?.response?.data?.message ||
-            err?.message ||
-            "Unable to load workspace overview.",
-        );
-
-        setProjects([]);
-        setTasks([]);
-      } finally {
-        if (active) {
-          setLoadingData(false);
-        }
-      }
-    };
-
-    fetchData();
+    loadData("initial");
 
     return () => {
-      active = false;
+      requestRef.current += 1;
     };
-  }, [currentWorkspaceId]);
+  }, [loadData]);
 
-  const completed = tasks.filter((task) => task.status === "completed").length;
+  useLayoutEffect(() => {
+    const root = rootRef.current;
 
-  const inProgress = tasks.filter(
-    (task) => task.status === "inProgress",
-  ).length;
+    if (
+      !root ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.from(root, {
+        opacity: 0,
+        y: 8,
+        duration: 0.45,
+        ease: "power3.out",
+        clearProps: "transform,opacity",
+      });
+    }, root);
+
+    return () => ctx.revert();
+  }, []);
+
+  /* Derived dashboard data */
+  const total = tasks.length;
+
+  const countByStatus = STATUSES.reduce((acc, status) => {
+    acc[status.key] = tasks.filter(
+      (task) => (task.status || "todo") === status.key
+    ).length;
+    return acc;
+  }, {});
 
   const overdue = tasks.filter(isOverdue).length;
+  const completedPercent = total
+    ? Math.round((countByStatus.completed / total) * 100)
+    : 0;
 
   const stats = [
     {
-      label: "Total Tasks",
-      value: tasks.length,
-      detail: "Tasks in this workspace",
-      icon: ClipboardList,
+      label: "Total tasks",
+      value: total,
+      helper: "Across this workspace",
+      icon: ListTodo,
+      tone: "neutral",
     },
     {
       label: "Completed",
-      value: completed,
-      detail: "Tasks finished",
+      value: countByStatus.completed,
+      helper: `${completedPercent}% of all tasks`,
       icon: CheckCircle2,
+      tone: "success",
     },
     {
-      label: "In Progress",
-      value: inProgress,
-      detail: "Currently active",
+      label: "In progress",
+      value: countByStatus.inProgress,
+      helper: "Currently being worked on",
       icon: Clock3,
+      tone: "primary",
     },
     {
       label: "Overdue",
       value: overdue,
-      detail: "Past their due date",
+      helper: overdue > 0 ? "Needs your attention" : "Nothing past due",
       icon: AlertCircle,
+      tone: overdue > 0 ? "danger" : "neutral",
     },
   ];
 
@@ -277,360 +549,567 @@ export default function Overview() {
     .sort(
       (a, b) =>
         new Date(b.updatedAt || b.createdAt || 0).getTime() -
-        new Date(a.updatedAt || a.createdAt || 0).getTime(),
+        new Date(a.updatedAt || a.createdAt || 0).getTime()
     )
     .slice(0, 6);
 
+  const projectRows = projects
+    .map((project) => {
+      const id = getId(project);
+      const projectTasks = tasks.filter(
+        (task) => getId(task.project) === id
+      );
+      const done = projectTasks.filter(
+        (task) => task.status === "completed"
+      ).length;
+
+      return {
+        id,
+        name: project.name || project.title || "Untitled project",
+        total: projectTasks.length,
+        done,
+        percent: projectTasks.length
+          ? Math.round((done / projectTasks.length) * 100)
+          : 0,
+      };
+    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  const renderTaskStatus = (task) => {
+    const status = STATUS_BY_KEY[task.status] || STATUS_BY_KEY.todo;
+
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+        style={{
+          background: "var(--surface-muted)",
+          color: status.color,
+        }}
+      >
+        <span
+          aria-hidden="true"
+          className="size-1.5 rounded-full"
+          style={{ background: status.color }}
+        />
+        {status.label}
+      </span>
+    );
+  };
+
+  const renderPriority = (priority = "medium") => {
+    const normalized = String(priority).toLowerCase();
+    const isHigh = normalized === "high";
+    const isUrgent = normalized === "urgent";
+
+    return (
+      <span
+        className="inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize"
+        style={{
+          background:
+            isHigh || isUrgent
+              ? "var(--danger-soft)"
+              : "var(--surface-muted)",
+          color:
+            isUrgent || isHigh
+              ? "var(--danger)"
+              : "var(--text-muted)",
+        }}
+      >
+        {normalized}
+      </span>
+    );
+  };
+
   return (
     <div
-      className="mx-auto max-w-7xl space-y-6"
-      style={{ color: "var(--text)" }}
+      ref={rootRef}
+      className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 text-[var(--text)] sm:space-y-7 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
     >
-      {/* Page heading */}
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Here's what's happening with your work.
+      {/* Header */}
+      <header className="flex flex-col gap-5 border-b border-[var(--border)] pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+            <span className="size-1.5 rounded-full bg-[var(--primary)]" />
+            Workspace overview
           </p>
 
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+          <h1
+            className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl"
+            style={displayFont}
+          >
             Overview
           </h1>
+
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
+            {currentWorkspace?.name
+              ? `A snapshot of tasks and project progress in ${currentWorkspace.name}.`
+              : "Choose a workspace to see your team's tasks and project progress."}
+          </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <select
-            aria-label="Select workspace"
-            value={currentWorkspaceId || ""}
-            onChange={(event) => setCurrentWorkspace(event.target.value)}
-            disabled={loadingWorkspaces || workspaces.length === 0}
-            className="rounded-lg border px-3 py-2 text-sm outline-none"
-            style={{
-              background: "var(--surface)",
-              color: "var(--text)",
-              borderColor: "var(--border)",
-            }}
-          >
-            {loadingWorkspaces ? (
-              <option value="">Loading workspaces...</option>
-            ) : workspaces.length === 0 ? (
-              <option value="">No workspaces available</option>
-            ) : (
-              workspaces.map((workspace) => (
-                <option key={getId(workspace)} value={getId(workspace)}>
-                  {workspace.name}
-                </option>
-              ))
-            )}
-          </select>
+        <div className="flex w-full min-w-0 items-end gap-2 sm:w-auto sm:gap-3">
+          <div className="min-w-0 flex-1 sm:flex-none">
+            <WorkspacePicker
+              workspaces={workspaces}
+              selectedId={currentWorkspaceId || ""}
+              onSelect={setCurrentWorkspace}
+              loading={loadingWorkspaces}
+            />
+          </div>
 
           <button
             type="button"
-            onClick={() => loadOverviewData(true)}
+            onClick={() => loadData("refresh")}
             disabled={!currentWorkspaceId || refreshing || loadingData}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
-            style={{
-              background: "var(--surface)",
-              color: "var(--text)",
-              borderColor: "var(--border)",
-            }}
+            aria-label="Refresh overview"
+            title="Refresh overview"
+            className="inline-flex size-12 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-auto sm:px-4"
           >
-            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
-            Refresh
+            <RefreshCw
+              size={16}
+              className={refreshing ? "animate-spin" : ""}
+            />
+            <span className="hidden sm:inline">
+              {refreshing ? "Refreshing" : "Refresh"}
+            </span>
           </button>
         </div>
-      </section>
+      </header>
 
-      {/* Error message */}
+      {/* Error */}
       {error && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-lg border px-4 py-3 text-sm"
-          style={{
-            borderColor: "#dc7777",
-            color: "#c24141",
-            background: "var(--surface)",
-          }}
+          className="flex flex-col gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-soft)] px-4 py-3.5 text-sm text-[var(--danger)] sm:flex-row sm:items-center"
         >
-          <AlertCircle size={17} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
+          <span className="flex min-w-0 flex-1 items-start gap-2.5 leading-5">
+            <AlertCircle size={17} className="mt-0.5 shrink-0" />
+            {error}
+          </span>
+          <button
+            type="button"
+            onClick={() => loadData("initial")}
+            className="self-start font-semibold underline-offset-4 hover:underline sm:self-auto"
+          >
+            Try again
+          </button>
         </div>
       )}
 
-      {/* Current workspace */}
-      <section
-        className="rounded-xl border p-4 sm:p-5"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="flex size-11 items-center justify-center rounded-lg"
-            style={{
-              color: "var(--primary)",
-              background: "var(--primary-soft, #e1f2ef)",
-            }}
-          >
-            <FolderKanban size={21} />
-          </div>
-
-          <div className="min-w-0">
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Current workspace
-            </p>
-
-            <h2 className="break-words font-semibold">
-              {currentWorkspace?.name || "No workspace selected"}
-            </h2>
-          </div>
+      {/* Statistics */}
+      <section aria-label="Task statistics">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-[var(--text)]">
+            At a glance
+          </h2>
+          {currentWorkspace && (
+            <span className="truncate text-xs text-[var(--text-subtle)]">
+              {currentWorkspace.name}
+            </span>
+          )}
         </div>
 
-        {currentWorkspace?.description && (
-          <p
-            className="mt-3 text-sm leading-6"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {currentWorkspace.description}
-          </p>
-        )}
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            const toneClass =
+              stat.tone === "success"
+                ? "text-[var(--success)]"
+                : stat.tone === "primary"
+                  ? "text-[var(--primary)]"
+                  : stat.tone === "danger"
+                    ? "text-[var(--danger)]"
+                    : "text-[var(--text-muted)]";
+
+            return (
+              <article
+                key={stat.label}
+                className={`${panelClass} min-w-0 p-4 sm:p-5`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium text-[var(--text-muted)] sm:text-sm">
+                    {stat.label}
+                  </p>
+
+                  <span
+                    className={`flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-muted)] ${toneClass}`}
+                  >
+                    <Icon size={16} strokeWidth={1.9} />
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-end justify-between gap-2">
+                  <p
+                    className={`text-2xl font-bold tabular-nums tracking-tight sm:text-3xl ${stat.tone === "danger"
+                        ? "text-[var(--danger)]"
+                        : "text-[var(--text)]"
+                      }`}
+                    style={displayFont}
+                  >
+                    {loadingData ? "—" : stat.value}
+                  </p>
+
+                  <span className="pb-1 text-[10px] leading-4 text-[var(--text-subtle)] sm:text-[11px]">
+                    {stat.helper}
+                  </span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </section>
 
-      {/* Statistics */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
+      {/* Main content */}
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.85fr)]">
+        {/* Recent tasks */}
+        <section className={`${panelClass} min-w-0 overflow-hidden`}>
+          <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] px-4 py-4 sm:px-5 sm:py-5">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-[var(--text)] sm:text-base">
+                Recent tasks
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)] sm:text-sm">
+                The latest activity in this workspace.
+              </p>
+            </div>
 
-          return (
-            <article
-              key={stat.label}
-              className="rounded-xl border p-5"
-              style={{
-                background: "var(--surface)",
-                borderColor: "var(--border)",
-              }}
+            <Link
+              to="/dashboard/tasks"
+              className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold transition-colors hover:text-[var(--primary)] sm:text-sm"
+              style={{ color: "var(--primary)" }}
             >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  {stat.label}
-                </p>
+              View all
+              <ArrowUpRight size={14} />
+            </Link>
+          </div>
 
-                <Icon size={19} style={{ color: "var(--primary)" }} />
+          {loadingData ? (
+            <div className="flex min-h-56 flex-col items-center justify-center px-5 py-12 text-center">
+              <Loader2
+                size={22}
+                className="animate-spin text-[var(--primary)]"
+              />
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                Loading tasks...
+              </p>
+            </div>
+          ) : recentTasks.length === 0 ? (
+            <div className="flex min-h-56 flex-col items-center justify-center px-5 py-12 text-center">
+              <span className="flex size-11 items-center justify-center rounded-xl bg-[var(--surface-muted)] text-[var(--text-muted)]">
+                <ListTodo size={20} />
+              </span>
+              <p className="mt-3 text-sm font-semibold text-[var(--text)]">
+                {currentWorkspace ? "No tasks yet" : "No workspace selected"}
+              </p>
+              <p className="mt-1 max-w-xs text-xs leading-5 text-[var(--text-muted)] sm:text-sm">
+                {currentWorkspace
+                  ? "Tasks created in this workspace will appear here."
+                  : "Select a workspace to see its latest tasks."}
+              </p>
+              <Link
+                to="/dashboard/tasks"
+                className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--primary)] hover:underline sm:text-sm"
+              >
+                Open tasks
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          ) : (
+            <>
+              {/* Desktop and tablet table */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[650px] text-left text-sm">
+                  <thead className="bg-[var(--surface-muted)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
+                    <tr>
+                      <th className="px-5 py-3">Task</th>
+                      <th className="px-4 py-3">Project</th>
+                      <th className="px-4 py-3">Priority</th>
+                      <th className="px-4 py-3">Due date</th>
+                      <th className="px-5 py-3">Status</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {recentTasks.map((task) => {
+                      const taskId = getId(task);
+                      const priority = task.priority || "medium";
+                      const late = isOverdue(task);
+
+                      return (
+                        <tr
+                          key={taskId || task.title}
+                          className="border-t border-[var(--border)] transition-colors duration-150 hover:bg-[var(--surface-muted)]"
+                        >
+                          <td className="max-w-[220px] px-5 py-4">
+                            {taskId ? (
+                              <Link
+                                to={`/dashboard/tasks/${encodeURIComponent(taskId)}`}
+                                className="block truncate font-medium hover:underline"
+                                style={taskLinkStyle}
+                              >
+                                {task.title || "Untitled task"}
+                              </Link>
+                            ) : (
+                              <span className="block truncate font-medium">
+                                {task.title || "Untitled task"}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="max-w-[150px] truncate px-4 py-4 text-[var(--text-muted)]">
+                            {task.project?.name || task.project?.title || "—"}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {renderPriority(priority)}
+                          </td>
+
+                          <td
+                            className={`whitespace-nowrap px-4 py-4 text-xs ${late
+                                ? "font-semibold text-[var(--danger)]"
+                                : "text-[var(--text-muted)]"
+                              }`}
+                          >
+                            {formatDate(task.dueDate)}
+                            {late && (
+                              <span className="sr-only"> (overdue)</span>
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            {renderTaskStatus(task)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
-              <p className="mt-3 text-3xl font-semibold tabular-nums">
-                {loadingData ? "—" : stat.value}
-              </p>
-
-              <p
-                className="mt-2 text-xs"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {stat.detail}
-              </p>
-            </article>
-          );
-        })}
-      </section>
-
-      {/* Recent tasks */}
-      <section
-        className="overflow-hidden rounded-xl border"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-        }}
-      >
-        <div
-          className="flex items-center justify-between gap-3 border-b px-5 py-4"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <div>
-            <h2 className="font-semibold">Recent Tasks</h2>
-
-            <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-              Recent activity in the selected workspace.
-            </p>
-          </div>
-
-          <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {loadingData ? "Loading..." : `${tasks.length} tasks`}
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px] text-left text-sm">
-            <thead
-              className="text-xs uppercase tracking-wide"
-              style={{
-                background: "var(--surface-muted)",
-                color: "var(--text-muted)",
-              }}
-            >
-              <tr>
-                <th className="px-5 py-3 font-medium">Task</th>
-                <th className="px-5 py-3 font-medium">Project</th>
-                <th className="px-5 py-3 font-medium">Priority</th>
-                <th className="px-5 py-3 font-medium">Due Date</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loadingData ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center">
-                    <RefreshCw
-                      size={20}
-                      className="mx-auto animate-spin"
-                      style={{
-                        color: "var(--primary)",
-                      }}
-                    />
-
-                    <p
-                      className="mt-3 text-sm"
-                      style={{
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      Loading workspace data...
-                    </p>
-                  </td>
-                </tr>
-              ) : recentTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center">
-                    <ClipboardList
-                      size={27}
-                      className="mx-auto"
-                      style={{
-                        color: "var(--text-muted)",
-                      }}
-                    />
-
-                    <p className="mt-3 text-sm font-medium">
-                      {currentWorkspace ? "No tasks yet" : "Select a workspace"}
-                    </p>
-
-                    <p
-                      className="mt-1 text-sm"
-                      style={{
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {currentWorkspace
-                        ? "Tasks in this workspace will appear here."
-                        : "Choose a workspace to view its tasks."}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                recentTasks.map((task) => {
-                  const status = task.status || "todo";
-                  const priority = task.priority || "medium";
+              {/* Mobile task list */}
+              <div className="divide-y divide-[var(--border)] md:hidden">
+                {recentTasks.map((task) => {
                   const taskId = getId(task);
+                  const late = isOverdue(task);
 
                   return (
-                    <tr
-                      key={taskId}
-                      className="border-t transition-colors hover:bg-[var(--surface-muted)]"
-                      style={{
-                        borderColor: "var(--border)",
-                      }}
+                    <article
+                      key={taskId || task.title}
+                      className="space-y-3 px-4 py-4"
                     >
-                      <td className="max-w-xs px-5 py-4">
-                        {taskId ? (
-                          <Link
-                            to={`/dashboard/tasks/${encodeURIComponent(taskId)}`}
-                            className="inline-flex max-w-full items-center gap-1 font-medium hover:underline"
-                            style={{
-                              color: "var(--text)",
-                            }}
-                          >
-                            <span className="truncate">
+                      <div className="flex min-w-0 items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          {taskId ? (
+                            <Link
+                              to={`/dashboard/tasks/${encodeURIComponent(taskId)}`}
+                              className="line-clamp-2 text-sm font-semibold hover:underline"
+                              style={taskLinkStyle}
+                            >
                               {task.title || "Untitled task"}
-                            </span>
+                            </Link>
+                          ) : (
+                            <p className="line-clamp-2 text-sm font-semibold">
+                              {task.title || "Untitled task"}
+                            </p>
+                          )}
 
-                            <ArrowUpRight size={14} className="shrink-0" />
-                          </Link>
-                        ) : (
-                          <span className="font-medium">
-                            {task.title || "Untitled task"}
-                          </span>
-                        )}
-                      </td>
+                          <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
+                            {task.project?.name ||
+                              task.project?.title ||
+                              "No project"}
+                          </p>
+                        </div>
 
-                      <td
-                        className="px-5 py-4"
-                        style={{
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        {task.project?.name || task.project?.title || "—"}
-                      </td>
+                        {renderPriority(task.priority || "medium")}
+                      </div>
 
-                      <td
-                        className="px-5 py-4 font-medium capitalize"
-                        style={{
-                          color:
-                            priorityColors[priority] || priorityColors.medium,
-                        }}
-                      >
-                        {priority}
-                      </td>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        {renderTaskStatus(task)}
 
-                      <td
-                        className="whitespace-nowrap px-5 py-4"
-                        style={{
-                          color: isOverdue(task)
-                            ? "#dc2626"
-                            : "var(--text-muted)",
-                        }}
-                      >
-                        {formatDate(task.dueDate)}
-                      </td>
-
-                      <td className="px-5 py-4">
                         <span
-                          className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium"
-                          style={statusStyles[status] || statusStyles.todo}
+                          className={`inline-flex items-center gap-1.5 text-xs ${late
+                              ? "font-semibold text-[var(--danger)]"
+                              : "text-[var(--text-muted)]"
+                            }`}
                         >
-                          {statusLabels[status] || status}
+                          <CalendarDays size={13} />
+                          {formatDate(task.dueDate)}
                         </span>
-                      </td>
-                    </tr>
+                      </div>
+                    </article>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                })}
+              </div>
+            </>
+          )}
+        </section>
 
-      {/* Project summary */}
-      <section
-        className="rounded-xl border p-5"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <FolderKanban size={20} style={{ color: "var(--primary)" }} />
-          <h2 className="font-semibold">Projects in this workspace</h2>
-        </div>
+        {/* Right side */}
+        <aside className="grid min-w-0 gap-5 sm:grid-cols-2 xl:grid-cols-1">
+          {/* Task status */}
+          <section className={`${panelClass} min-w-0 p-4 sm:p-5`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-[var(--text)] sm:text-base">
+                  Task status
+                </h2>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Breakdown by workflow stage.
+                </p>
+              </div>
 
-        <p className="mt-3 text-2xl font-semibold tabular-nums">
-          {loadingData ? "—" : projects.length}
-        </p>
+              <span className="rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5 text-xs font-semibold tabular-nums text-[var(--text-muted)]">
+                {loadingData ? "—" : total}
+              </span>
+            </div>
 
-        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          {projects.length === 1 ? "Project" : "Projects"} available in{" "}
-          {currentWorkspace?.name || "the selected workspace"}.
-        </p>
-      </section>
+            <div className="mt-5 space-y-4">
+              {STATUSES.map((status) => {
+                const count = countByStatus[status.key] || 0;
+                const percent = total
+                  ? Math.round((count / total) * 100)
+                  : 0;
+
+                return (
+                  <div key={status.key}>
+                    <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+                      <span className="flex min-w-0 items-center gap-2 text-[var(--text-muted)]">
+                        <span
+                          aria-hidden="true"
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ background: status.color }}
+                        />
+                        <span className="truncate">{status.label}</span>
+                      </span>
+
+                      <span className="shrink-0 font-semibold tabular-nums text-[var(--text)]">
+                        {loadingData ? "—" : count}
+                      </span>
+                    </div>
+
+                    <div
+                      className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+                      role="progressbar"
+                      aria-label={`${status.label} tasks`}
+                      aria-valuemin={0}
+                      aria-valuemax={total || 1}
+                      aria-valuenow={loadingData ? 0 : count}
+                    >
+                      <div
+                        className="h-full rounded-full transition-[width] duration-300"
+                        style={{
+                          width: loadingData ? "0%" : `${percent}%`,
+                          background: status.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Projects */}
+          <section className={`${panelClass} min-w-0 p-4 sm:p-5`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-[var(--text)] sm:text-base">
+                  Projects
+                </h2>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Progress across your projects.
+                </p>
+              </div>
+
+              <Link
+                to="/dashboard/projects"
+                aria-label="View all projects"
+                title="View all projects"
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--primary)]"
+              >
+                <ArrowUpRight size={17} />
+              </Link>
+            </div>
+
+            {loadingData ? (
+              <div className="flex items-center gap-2 py-8 text-xs text-[var(--text-muted)]">
+                <Loader2 size={15} className="animate-spin" />
+                Loading projects...
+              </div>
+            ) : projectRows.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-[var(--surface-muted)] text-[var(--text-muted)]">
+                  <FolderKanban size={18} />
+                </span>
+
+                <p className="mt-3 text-sm font-medium text-[var(--text)]">
+                  No projects yet
+                </p>
+
+                <p className="mt-1 max-w-[220px] text-xs leading-5 text-[var(--text-muted)]">
+                  {currentWorkspace
+                    ? "Create a project to start organizing work."
+                    : "Select a workspace to see its projects."}
+                </p>
+
+                <Link
+                  to="/dashboard/projects"
+                  className="mt-3 text-xs font-semibold text-[var(--primary)] hover:underline"
+                >
+                  Explore projects
+                </Link>
+              </div>
+            ) : (
+              <ul className="mt-5 space-y-4">
+                {projectRows.map((project) => (
+                  <li
+                    key={project.id || project.name}
+                    className="min-w-0"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      {project.id ? (
+                        <Link
+                          to={`/dashboard/projects/${encodeURIComponent(project.id)}`}
+                          className="min-w-0 truncate text-xs font-semibold text-[var(--text)] hover:text-[var(--primary)] hover:underline"
+                        >
+                          {project.name}
+                        </Link>
+                      ) : (
+                        <span className="min-w-0 truncate text-xs font-semibold text-[var(--text)]">
+                          {project.name}
+                        </span>
+                      )}
+
+                      <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-muted)]">
+                        {project.total ? `${project.percent}%` : "No tasks"}
+                      </span>
+                    </div>
+
+                    <div
+                      className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+                      role="progressbar"
+                      aria-label={`${project.name} progress`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={project.percent}
+                    >
+                      <div
+                        className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-300"
+                        style={{ width: `${project.percent}%` }}
+                      />
+                    </div>
+
+                    <p className="mt-1.5 text-[10px] text-[var(--text-subtle)]">
+                      {project.done} of {project.total} tasks completed
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }
