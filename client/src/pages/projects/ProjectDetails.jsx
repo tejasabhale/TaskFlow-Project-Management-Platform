@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { gsap } from "gsap";
 import {
     ArrowLeft,
+    ArrowUpRight,
     AlertCircle,
     CalendarDays,
     CheckCircle2,
     Clock3,
     ClipboardList,
     FolderKanban,
+    Loader2,
     Pencil,
     RefreshCw,
     Save,
@@ -19,57 +22,57 @@ import {
 import api from "../../api/axios";
 import { getTasks } from "../../services/task.service.js";
 
-const projectStatuses = [
-    "Planning",
-    "Active",
-    "Completed",
-    "Archived",
-];
+/* Same loader id as the other pages, so the font is only added once */
+const DISPLAY_FONT_ID = "login-display-font";
+const DISPLAY_FONT_URL =
+    "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
 
-const taskStatusLabels = {
-    todo: "To Do",
-    inProgress: "In Progress",
-    review: "In Review",
-    completed: "Completed",
+const displayFont = {
+    fontFamily:
+        '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
 };
 
-const taskStatusStyles = {
-    todo: {
-        background: "var(--surface-muted)",
-        color: "var(--text-muted)",
-    },
-    inProgress: {
-        background: "var(--primary-soft, #e1f2ef)",
-        color: "var(--primary)",
-    },
-    review: {
-        background: "#fff7ed",
-        color: "#c2410c",
-    },
-    completed: {
-        background: "#ecfdf5",
-        color: "#047857",
-    },
+/* index.css sets an unlayered color on <a>, so link colors are inline */
+const mutedLinkStyle = { color: "var(--text-muted)" };
+const textLinkStyle = { color: "var(--text)" };
+const primaryLinkStyle = { color: "var(--primary-text)" };
+
+const projectStatuses = ["Planning", "Active", "Completed", "Archived"];
+
+const projectStatusBadge = {
+    Planning: "bg-[var(--surface-muted)] text-[var(--text-muted)]",
+    Active: "bg-[var(--primary-soft)] text-[var(--primary-text)]",
+    Completed: "bg-[var(--success-soft)] text-[var(--success)]",
+    Archived: "bg-[var(--surface-muted)] text-[var(--text-subtle)]",
 };
 
-const projectStatusStyles = {
-    Planning: {
-        background: "var(--surface-muted)",
-        color: "var(--text-muted)",
-    },
-    Active: {
-        background: "var(--primary-soft, #e1f2ef)",
-        color: "var(--primary)",
-    },
-    Completed: {
-        background: "#ecfdf5",
-        color: "#047857",
-    },
-    Archived: {
-        background: "#f1f5f9",
-        color: "#64748b",
-    },
+const TASK_STATUSES = {
+    todo: { label: "To do", color: "var(--text-subtle)" },
+    inProgress: { label: "In progress", color: "var(--primary)" },
+    review: { label: "In review", color: "var(--warning)" },
+    completed: { label: "Completed", color: "var(--success)" },
 };
+
+const priorityText = {
+    low: "text-[var(--text-muted)]",
+    medium: "text-[var(--warning)]",
+    high: "font-semibold text-[var(--danger)]",
+};
+
+const fieldBase =
+    "w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 text-base text-[var(--text)] " +
+    "hover:border-[var(--border-strong)] placeholder:text-[var(--text-subtle)] " +
+    "disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
+const field = `${fieldBase} mt-2 h-11`;
+
+const panel = "rounded-xl border border-[var(--border)] bg-[var(--surface)]";
+
+const btnBase =
+    "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold whitespace-nowrap " +
+    "disabled:cursor-not-allowed disabled:opacity-50";
+const btnSecondary = `${btnBase} border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)]`;
+const btnPrimary = `${btnBase} btn-primary active:scale-[0.98]`;
+const btnDanger = `${btnBase} border border-[var(--danger)] bg-[var(--surface)] text-[var(--danger)] hover:bg-[var(--danger-soft)]`;
 
 const initialForm = {
     name: "",
@@ -78,6 +81,8 @@ const initialForm = {
     startDate: "",
     endDate: "",
 };
+
+/* ---------- data helpers ---------- */
 
 function getId(value) {
     if (!value) return "";
@@ -107,13 +112,13 @@ function getList(response, key) {
     return [];
 }
 
+const isObjectId = (value) => typeof value === "string" && /^[a-f\d]{24}$/i.test(value);
+
 function getPersonName(person) {
     if (!person) return "Not available";
 
     if (typeof person === "string") {
-        return /^[a-f\d]{24}$/i.test(person)
-            ? "User details unavailable"
-            : person;
+        return isObjectId(person) ? "User details unavailable" : person;
     }
 
     return (
@@ -130,7 +135,7 @@ function getRelationName(value, fallback) {
     if (!value) return fallback;
 
     if (typeof value === "string") {
-        return /^[a-f\d]{24}$/i.test(value) ? fallback : value;
+        return isObjectId(value) ? fallback : value;
     }
 
     return value.name || value.title || fallback;
@@ -199,16 +204,24 @@ function isOverdueDate(value) {
     return endDate < today;
 }
 
+function projectToForm(project) {
+    return {
+        name: project.name || "",
+        description: project.description || "",
+        status: project.status || "Planning",
+        startDate: toDateInput(project.startDate),
+        endDate: toDateInput(project.endDate),
+    };
+}
+
+/* ---------- small components ---------- */
+
 function Field({ label, htmlFor, children }) {
     return (
         <div>
-            <label
-                htmlFor={htmlFor}
-                className="mb-2 block text-sm font-medium"
-            >
+            <label htmlFor={htmlFor} className="text-sm font-semibold">
                 {label}
             </label>
-
             {children}
         </div>
     );
@@ -217,36 +230,43 @@ function Field({ label, htmlFor, children }) {
 function MetadataItem({ icon: Icon, label, children }) {
     return (
         <div className="flex min-w-0 items-start gap-3">
-            <div
-                className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg"
-                style={{
-                    background: "var(--surface-muted)",
-                    color: "var(--text-muted)",
-                }}
-            >
-                <Icon size={17} />
+            <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-muted)] text-[var(--text-muted)]">
+                <Icon size={17} aria-hidden="true" />
             </div>
 
             <div className="min-w-0 flex-1">
-                <p
-                    className="text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                >
-                    {label}
-                </p>
-
-                <div className="mt-1 break-words text-sm font-medium">
-                    {children}
-                </div>
+                <p className="text-xs text-[var(--text-muted)]">{label}</p>
+                <div className="mt-0.5 break-words text-sm font-semibold">{children}</div>
             </div>
         </div>
     );
 }
 
+function ProgressBar({ value, label }) {
+    return (
+        <div
+            className="h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+            role="progressbar"
+            aria-label={label}
+            aria-valuenow={value}
+            aria-valuemin={0}
+            aria-valuemax={100}
+        >
+            <div
+                className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-500"
+                style={{ width: `${value}%` }}
+            />
+        </div>
+    );
+}
+
+/* ---------- page ---------- */
+
 export default function ProjectDetails() {
     const { projectId, id } = useParams();
     const resolvedProjectId = projectId || id;
     const navigate = useNavigate();
+    const rootRef = useRef(null);
 
     const [project, setProject] = useState(null);
     const [tasks, setTasks] = useState([]);
@@ -262,6 +282,47 @@ export default function ProjectDetails() {
     const [error, setError] = useState("");
     const [taskError, setTaskError] = useState("");
     const [success, setSuccess] = useState("");
+
+    useEffect(() => {
+        if (document.getElementById(DISPLAY_FONT_ID)) return;
+        const link = document.createElement("link");
+        link.id = DISPLAY_FONT_ID;
+        link.rel = "stylesheet";
+        link.href = DISPLAY_FONT_URL;
+        document.head.appendChild(link);
+    }, []);
+
+    const hasProject = Boolean(project);
+
+    /* One quiet fade when the page first shows. Nothing else moves on its own. */
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+        if (
+            !root ||
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+            return;
+        }
+
+        const ctx = gsap.context(() => {
+            gsap.from(root, {
+                opacity: 0,
+                y: 10,
+                duration: 0.5,
+                ease: "power3.out",
+                clearProps: "transform,opacity",
+            });
+        }, root);
+
+        return () => ctx.revert();
+    }, [hasProject]);
+
+    /* The success message goes away on its own */
+    useEffect(() => {
+        if (!success) return;
+        const timer = setTimeout(() => setSuccess(""), 4000);
+        return () => clearTimeout(timer);
+    }, [success]);
 
     // Load project information and its related tasks.
     const loadProject = useCallback(
@@ -282,10 +343,7 @@ export default function ProjectDetails() {
             setTaskError("");
 
             try {
-                const response = await api.get(
-                    `/projects/${resolvedProjectId}`
-                );
-
+                const response = await api.get(`/projects/${resolvedProjectId}`);
                 const projectData = getEntity(response, "project");
 
                 if (!projectData?._id) {
@@ -293,14 +351,7 @@ export default function ProjectDetails() {
                 }
 
                 setProject(projectData);
-
-                setForm({
-                    name: projectData.name || "",
-                    description: projectData.description || "",
-                    status: projectData.status || "Planning",
-                    startDate: toDateInput(projectData.startDate),
-                    endDate: toDateInput(projectData.endDate),
-                });
+                setForm(projectToForm(projectData));
 
                 // The Project schema doesn't store task lists.
                 // Fetch tasks separately and match their project reference.
@@ -310,22 +361,16 @@ export default function ProjectDetails() {
                     const workspaceId = getId(projectData.workspace);
 
                     const taskResponse = await getTasks(
-                        workspaceId
-                            ? { workspaceId }
-                            : { projectId: resolvedProjectId }
+                        workspaceId ? { workspaceId } : { projectId: resolvedProjectId }
                     );
 
-                    const taskList = getList(taskResponse, "tasks");
-
                     setTasks(
-                        taskList.filter(
-                            (task) =>
-                                getId(task.project) === resolvedProjectId
+                        getList(taskResponse, "tasks").filter(
+                            (task) => getId(task.project) === resolvedProjectId
                         )
                     );
                 } catch (err) {
                     setTasks([]);
-
                     setTaskError(
                         err?.response?.data?.message ||
                         "Unable to load tasks for this project."
@@ -353,24 +398,20 @@ export default function ProjectDetails() {
 
     const updateForm = (event) => {
         const { name, value } = event.target;
+        setForm((current) => ({ ...current, [name]: value }));
+    };
 
-        setForm((current) => ({
-            ...current,
-            [name]: value,
-        }));
+    const startEditing = () => {
+        setError("");
+        setSuccess("");
+        setForm(projectToForm(project));
+        setEditing(true);
     };
 
     const cancelEditing = () => {
         setEditing(false);
         setError("");
-
-        setForm({
-            name: project.name || "",
-            description: project.description || "",
-            status: project.status || "Planning",
-            startDate: toDateInput(project.startDate),
-            endDate: toDateInput(project.endDate),
-        });
+        setForm(projectToForm(project));
     };
 
     const handleSave = async (event) => {
@@ -383,24 +424,16 @@ export default function ProjectDetails() {
         const description = form.description.trim();
 
         if (name.length < 3) {
-            setError(
-                "Project name must contain at least 3 characters."
-            );
+            setError("Project name must contain at least 3 characters.");
             return;
         }
 
         if (description && description.length < 5) {
-            setError(
-                "Description must be empty or contain at least 5 characters."
-            );
+            setError("Description must be empty or contain at least 5 characters.");
             return;
         }
 
-        if (
-            form.startDate &&
-            form.endDate &&
-            form.startDate > form.endDate
-        ) {
+        if (form.startDate && form.endDate && form.startDate > form.endDate) {
             setError("The start date cannot be after the end date.");
             return;
         }
@@ -416,11 +449,7 @@ export default function ProjectDetails() {
                 endDate: form.endDate || null,
             };
 
-            const response = await api.patch(
-                `/projects/${resolvedProjectId}`,
-                payload
-            );
-
+            const response = await api.patch(`/projects/${resolvedProjectId}`, payload);
             const updatedProject = getEntity(response, "project");
 
             setProject((current) => ({
@@ -433,7 +462,7 @@ export default function ProjectDetails() {
 
             await loadProject(true);
 
-            setSuccess("Project updated successfully.");
+            setSuccess("Project updated.");
         } catch (err) {
             setError(
                 err?.response?.data?.message ||
@@ -471,31 +500,25 @@ export default function ProjectDetails() {
     };
 
     // Derived task statistics.
-    const completedTasks = useMemo(
-        () =>
-            tasks.filter((task) => task.status === "completed").length,
-        [tasks]
-    );
+    const { totalTasks, completedTasks, inProgressTasks, progress } = useMemo(() => {
+        const total = tasks.length;
+        const completed = tasks.filter((task) => task.status === "completed").length;
+        const inProgress = tasks.filter((task) => task.status === "inProgress").length;
 
-    const inProgressTasks = useMemo(
-        () =>
-            tasks.filter((task) => task.status === "inProgress").length,
-        [tasks]
-    );
+        return {
+            totalTasks: total,
+            completedTasks: completed,
+            inProgressTasks: inProgress,
+            progress: total ? Math.round((completed / total) * 100) : 0,
+        };
+    }, [tasks]);
 
-    const totalTasks = tasks.length;
-
-    const progress = totalTasks
-        ? Math.round((completedTasks / totalTasks) * 100)
-        : 0;
+    /* ---------- loading / not found ---------- */
 
     if (loading) {
         return (
-            <div
-                className="flex min-h-64 items-center justify-center gap-3"
-                style={{ color: "var(--text-muted)" }}
-            >
-                <RefreshCw size={20} className="animate-spin" />
+            <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-[var(--text-muted)]">
+                <Loader2 size={18} className="animate-spin text-[var(--primary)]" />
                 Loading project details...
             </div>
         );
@@ -503,44 +526,34 @@ export default function ProjectDetails() {
 
     if (!project) {
         return (
-            <div className="mx-auto max-w-3xl space-y-5">
+            <div className="mx-auto max-w-3xl space-y-5 px-1 py-2 text-[var(--text)] sm:px-2 sm:py-4">
                 <Link
                     to="/dashboard/projects"
-                    className="inline-flex items-center gap-2 text-sm font-medium"
-                    style={{ color: "var(--primary)" }}
+                    style={mutedLinkStyle}
+                    className="inline-flex items-center gap-2 text-sm font-medium hover:underline"
                 >
                     <ArrowLeft size={16} />
-                    Back to Projects
+                    All projects
                 </Link>
 
-                <section
-                    className="rounded-xl border p-6"
-                    style={{
-                        background: "var(--surface)",
-                        borderColor: "var(--border)",
-                    }}
-                >
-                    <AlertCircle
-                        size={26}
-                        style={{ color: "#dc2626" }}
-                    />
+                <section className={`${panel} p-6 sm:p-8`}>
+                    <AlertCircle size={26} className="text-[var(--danger)]" />
 
-                    <h1 className="mt-3 text-lg font-semibold">
+                    <h1
+                        className="mt-3 text-xl font-bold tracking-tight"
+                        style={displayFont}
+                    >
                         Unable to display project
                     </h1>
 
-                    <p
-                        className="mt-2 text-sm"
-                        style={{ color: "var(--text-muted)" }}
-                    >
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                         {error || "The requested project could not be found."}
                     </p>
 
                     <button
                         type="button"
                         onClick={() => loadProject()}
-                        className="mt-5 rounded-lg px-4 py-2.5 text-sm font-medium text-white"
-                        style={{ background: "var(--primary)" }}
+                        className={`${btnPrimary} mt-5`}
                     >
                         Try again
                     </button>
@@ -549,688 +562,394 @@ export default function ProjectDetails() {
         );
     }
 
+    /* ---------- derived values ---------- */
+
     const workspaceName = getRelationName(
         project.workspace,
         "Workspace details unavailable"
     );
 
-    const projectCreator = getPersonName(project.createdBy);
-
-    const currentStatusStyle =
-        projectStatusStyles[project.status] ||
-        projectStatusStyles.Planning;
+    const creator = project.createdBy;
+    const statusKey = projectStatuses.includes(project.status) ? project.status : "Planning";
 
     const isPastEndDate =
         project.status !== "Completed" &&
         project.status !== "Archived" &&
         isOverdueDate(project.endDate);
 
+    const anyBusy = saving || deleting;
+
+    const stats = [
+        { label: "Total tasks", value: totalTasks },
+        { label: "Completed", value: completedTasks },
+        { label: "In progress", value: inProgressTasks },
+        { label: "Progress", value: `${progress}%`, bar: true },
+    ];
+
     return (
         <div
-            className="mx-auto max-w-7xl space-y-6 pb-8"
-            style={{ color: "var(--text)" }}
+            ref={rootRef}
+            className="mx-auto max-w-7xl space-y-6 px-1 py-2 pb-8 text-[var(--text)] sm:space-y-8 sm:px-2 sm:py-4"
         >
-            {/* Header */}
-            <section className="space-y-4">
+            {/* Heading */}
+            <header className="space-y-4">
                 <Link
                     to="/dashboard/projects"
-                    className="inline-flex items-center gap-2 text-sm font-medium"
-                    style={{ color: "var(--text-muted)" }}
+                    style={mutedLinkStyle}
+                    className="inline-flex items-center gap-2 text-sm font-medium hover:underline"
                 >
                     <ArrowLeft size={16} />
-                    Back to Projects
+                    All projects
                 </Link>
 
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                    <div className="flex min-w-0 items-start gap-3">
-                        <div
-                            className="flex size-12 shrink-0 items-center justify-center rounded-xl"
-                            style={{
-                                background: "var(--primary-soft, #e1f2ef)",
-                                color: "var(--primary)",
-                            }}
-                        >
-                            <FolderKanban size={23} />
-                        </div>
-
-                        <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">
-                                    {project.name}
-                                </h1>
-
-                                <span
-                                    className="rounded-full px-2.5 py-1 text-xs font-medium"
-                                    style={currentStatusStyle}
-                                >
-                                    {project.status || "Planning"}
-                                </span>
-
-                                {isPastEndDate && (
-                                    <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
-                                        Past end date
-                                    </span>
-                                )}
-                            </div>
-
-                            <p
-                                className="mt-2 text-sm"
-                                style={{ color: "var(--text-muted)" }}
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${projectStatusBadge[statusKey]}`}
                             >
-                                {workspaceName}
-                            </p>
+                                {statusKey}
+                            </span>
+
+                            {isPastEndDate && (
+                                <span className="rounded-full bg-[var(--danger-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--danger)]">
+                                    Past end date
+                                </span>
+                            )}
                         </div>
+
+                        <h1
+                            className="mt-3 break-words text-3xl font-bold tracking-tight sm:text-4xl"
+                            style={displayFont}
+                        >
+                            {project.name}
+                        </h1>
+
+                        <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                            {workspaceName}
+                        </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    {/* Actions: 2-col grid on phones, inline row from sm up */}
+                    <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
                         <button
                             type="button"
                             onClick={() => loadProject(true)}
-                            disabled={refreshing || saving || deleting}
-                            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium disabled:opacity-50"
-                            style={{
-                                background: "var(--surface)",
-                                borderColor: "var(--border)",
-                            }}
+                            disabled={refreshing || anyBusy}
+                            className={btnSecondary}
                         >
-                            <RefreshCw
-                                size={15}
-                                className={refreshing ? "animate-spin" : ""}
-                            />
+                            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
                             Refresh
                         </button>
 
                         {!editing && (
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setError("");
-                                    setSuccess("");
-
-                                    setForm({
-                                        name: project.name || "",
-                                        description: project.description || "",
-                                        status: project.status || "Planning",
-                                        startDate: toDateInput(project.startDate),
-                                        endDate: toDateInput(project.endDate),
-                                    });
-
-                                    setEditing(true);
-                                }}
-                                className="inline-flex items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-medium text-white"
-                                style={{ background: "var(--primary)" }}
+                                onClick={startEditing}
+                                disabled={anyBusy}
+                                className={btnPrimary}
                             >
                                 <Pencil size={15} />
-                                Edit Project
+                                Edit project
                             </button>
                         )}
 
                         <button
                             type="button"
                             onClick={handleDelete}
-                            disabled={deleting || saving}
-                            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium disabled:opacity-50"
-                            style={{
-                                background: "var(--surface)",
-                                borderColor: "var(--border)",
-                                color: "#dc2626",
-                            }}
+                            disabled={anyBusy}
+                            className={btnDanger}
                         >
-                            <Trash2 size={15} />
+                            {deleting ? (
+                                <Loader2 size={15} className="animate-spin" />
+                            ) : (
+                                <Trash2 size={15} />
+                            )}
                             {deleting ? "Deleting..." : "Delete"}
                         </button>
                     </div>
                 </div>
-            </section>
+            </header>
 
-            {/* Feedback */}
+            {/* Messages */}
             {error && (
                 <div
                     role="alert"
-                    className="flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-                    style={{
-                        color: "#b42318",
-                        borderColor: "#f2b8b5",
-                        background: "#fff4f2",
-                    }}
+                    className="flex items-start gap-3 rounded-lg bg-[var(--danger-soft)] px-5 py-4 text-sm leading-5 text-[var(--danger)]"
                 >
                     <AlertCircle size={17} className="mt-0.5 shrink-0" />
-                    <p>{error}</p>
+                    <span className="flex-1">{error}</span>
                 </div>
             )}
 
             {success && (
-                <div
+                <p
                     role="status"
-                    className="flex items-center gap-3 rounded-lg border px-4 py-3 text-sm"
-                    style={{
-                        color: "#187044",
-                        borderColor: "#b7e4c7",
-                        background: "#f0fff5",
-                    }}
+                    className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-sm font-medium text-[var(--success)]"
                 >
                     <CheckCircle2 size={17} className="shrink-0" />
                     {success}
-                </div>
+                </p>
             )}
 
-            {/* Statistics computed from related tasks */}
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div
-                    className="rounded-xl border p-5"
-                    style={{
-                        background: "var(--surface)",
-                        borderColor: "var(--border)",
-                    }}
-                >
-                    <div className="flex items-center justify-between">
+            {/* Stats */}
+            <section
+                aria-label="Project statistics"
+                className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--border)] lg:grid-cols-4"
+            >
+                {stats.map((stat) => (
+                    <div key={stat.label} className="bg-[var(--surface)] px-5 py-5 sm:px-6 sm:py-6">
+                        <p className="text-sm text-[var(--text-muted)]">{stat.label}</p>
                         <p
-                            className="text-sm"
-                            style={{ color: "var(--text-muted)" }}
+                            className="mt-2 text-3xl font-bold tabular-nums tracking-tight"
+                            style={displayFont}
                         >
-                            Total tasks
+                            {loadingTasks ? "—" : stat.value}
                         </p>
-                        <ClipboardList
-                            size={19}
-                            style={{ color: "var(--primary)" }}
-                        />
+                        {stat.bar && (
+                            <div className="mt-3">
+                                <ProgressBar
+                                    value={loadingTasks ? 0 : progress}
+                                    label="Project completion"
+                                />
+                            </div>
+                        )}
                     </div>
-
-                    <p className="mt-3 text-3xl font-semibold">
-                        {loadingTasks ? "—" : totalTasks}
-                    </p>
-
-                    <p
-                        className="mt-1 text-xs"
-                        style={{ color: "var(--text-muted)" }}
-                    >
-                        Tasks in this project
-                    </p>
-                </div>
-
-                <div
-                    className="rounded-xl border p-5"
-                    style={{
-                        background: "var(--surface)",
-                        borderColor: "var(--border)",
-                    }}
-                >
-                    <div className="flex items-center justify-between">
-                        <p
-                            className="text-sm"
-                            style={{ color: "var(--text-muted)" }}
-                        >
-                            Completed
-                        </p>
-                        <CheckCircle2 size={19} style={{ color: "#047857" }} />
-                    </div>
-
-                    <p className="mt-3 text-3xl font-semibold">
-                        {loadingTasks ? "—" : completedTasks}
-                    </p>
-
-                    <p
-                        className="mt-1 text-xs"
-                        style={{ color: "var(--text-muted)" }}
-                    >
-                        Tasks finished
-                    </p>
-                </div>
-
-                <div
-                    className="rounded-xl border p-5"
-                    style={{
-                        background: "var(--surface)",
-                        borderColor: "var(--border)",
-                    }}
-                >
-                    <div className="flex items-center justify-between">
-                        <p
-                            className="text-sm"
-                            style={{ color: "var(--text-muted)" }}
-                        >
-                            In progress
-                        </p>
-                        <Clock3
-                            size={19}
-                            style={{ color: "var(--primary)" }}
-                        />
-                    </div>
-
-                    <p className="mt-3 text-3xl font-semibold">
-                        {loadingTasks ? "—" : inProgressTasks}
-                    </p>
-
-                    <p
-                        className="mt-1 text-xs"
-                        style={{ color: "var(--text-muted)" }}
-                    >
-                        Currently active
-                    </p>
-                </div>
-
-                <div
-                    className="rounded-xl border p-5"
-                    style={{
-                        background: "var(--surface)",
-                        borderColor: "var(--border)",
-                    }}
-                >
-                    <div className="flex items-center justify-between">
-                        <p
-                            className="text-sm"
-                            style={{ color: "var(--text-muted)" }}
-                        >
-                            Progress
-                        </p>
-                        <CheckCircle2
-                            size={19}
-                            style={{ color: "var(--primary)" }}
-                        />
-                    </div>
-
-                    <p className="mt-3 text-3xl font-semibold">
-                        {loadingTasks ? "—" : `${progress}%`}
-                    </p>
-
-                    <div
-                        className="mt-3 h-2 overflow-hidden rounded-full"
-                        style={{ background: "var(--surface-muted)" }}
-                        role="progressbar"
-                        aria-label="Project completion"
-                        aria-valuenow={loadingTasks ? 0 : progress}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                    >
-                        <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                                width: `${loadingTasks ? 0 : progress}%`,
-                                background: "var(--primary)",
-                            }}
-                        />
-                    </div>
-                </div>
+                ))}
             </section>
 
             {/* Main layout */}
-            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_310px]">
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="min-w-0 space-y-6">
                     {/* Project details */}
-                    <section
-                        className="rounded-xl border p-5 sm:p-6"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                        }}
-                    >
-                        <div className="mb-5">
-                            <h2 className="text-lg font-semibold">
-                                Project details
-                            </h2>
-
-                            <p
-                                className="mt-1 text-sm"
-                                style={{ color: "var(--text-muted)" }}
-                            >
-                                Project name, description, status, and timeline.
+                    <section className={`${panel} overflow-hidden`}>
+                        <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
+                            <h2 className="font-semibold">Project details</h2>
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                Name, description, status and timeline.
                             </p>
                         </div>
 
-                        {!editing ? (
-                            <p
-                                className="whitespace-pre-wrap break-words text-sm leading-7"
-                                style={{ color: "var(--text-muted)" }}
-                            >
-                                {project.description ||
-                                    "No description has been provided."}
-                            </p>
-                        ) : (
-                            <form
-                                id="edit-project-form"
-                                onSubmit={handleSave}
-                                className="space-y-5"
-                            >
-                                <Field
-                                    label="Project name"
-                                    htmlFor="project-name"
+                        <div className="px-5 py-5 sm:px-6">
+                            {!editing ? (
+                                <p className="max-w-prose whitespace-pre-wrap break-words text-sm leading-7 text-[var(--text-muted)]">
+                                    {project.description || "No description has been provided."}
+                                </p>
+                            ) : (
+                                <form
+                                    id="edit-project-form"
+                                    onSubmit={handleSave}
+                                    className="space-y-5"
                                 >
-                                    <input
-                                        id="project-name"
-                                        name="name"
-                                        type="text"
-                                        minLength={3}
-                                        maxLength={120}
-                                        required
-                                        value={form.name}
-                                        onChange={updateForm}
-                                        className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:ring-2"
-                                        style={{
-                                            background: "var(--surface)",
-                                            color: "var(--text)",
-                                            borderColor: "var(--border)",
-                                        }}
-                                    />
-                                </Field>
-
-                                <Field
-                                    label="Description"
-                                    htmlFor="project-description"
-                                >
-                                    <textarea
-                                        id="project-description"
-                                        name="description"
-                                        rows={4}
-                                        maxLength={3000}
-                                        value={form.description}
-                                        onChange={updateForm}
-                                        placeholder="Describe the purpose and goals of this project."
-                                        className="w-full resize-y rounded-lg border px-3 py-2.5 text-sm leading-6 outline-none focus:ring-2"
-                                        style={{
-                                            background: "var(--surface)",
-                                            color: "var(--text)",
-                                            borderColor: "var(--border)",
-                                        }}
-                                    />
-                                </Field>
-
-                                <Field
-                                    label="Status"
-                                    htmlFor="project-status"
-                                >
-                                    <select
-                                        id="project-status"
-                                        name="status"
-                                        value={form.status}
-                                        onChange={updateForm}
-                                        className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:ring-2"
-                                        style={{
-                                            background: "var(--surface)",
-                                            color: "var(--text)",
-                                            borderColor: "var(--border)",
-                                        }}
-                                    >
-                                        {projectStatuses.map((status) => (
-                                            <option key={status} value={status}>
-                                                {status}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
-
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <Field
-                                        label="Start date"
-                                        htmlFor="project-start-date"
-                                    >
+                                    <Field label="Project name" htmlFor="project-name">
                                         <input
-                                            id="project-start-date"
-                                            name="startDate"
-                                            type="date"
-                                            max={form.endDate || undefined}
-                                            value={form.startDate}
+                                            id="project-name"
+                                            name="name"
+                                            type="text"
+                                            minLength={3}
+                                            maxLength={120}
+                                            required
+                                            value={form.name}
                                             onChange={updateForm}
-                                            className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
-                                            style={{
-                                                background: "var(--surface)",
-                                                color: "var(--text)",
-                                                borderColor: "var(--border)",
-                                            }}
+                                            className={field}
                                         />
                                     </Field>
 
-                                    <Field
-                                        label="End date"
-                                        htmlFor="project-end-date"
-                                    >
-                                        <input
-                                            id="project-end-date"
-                                            name="endDate"
-                                            type="date"
-                                            min={form.startDate || undefined}
-                                            value={form.endDate}
+                                    <Field label="Description" htmlFor="project-description">
+                                        <textarea
+                                            id="project-description"
+                                            name="description"
+                                            rows={4}
+                                            maxLength={3000}
+                                            value={form.description}
                                             onChange={updateForm}
-                                            className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
-                                            style={{
-                                                background: "var(--surface)",
-                                                color: "var(--text)",
-                                                borderColor: "var(--border)",
-                                            }}
+                                            placeholder="What is this project for?"
+                                            className={`${fieldBase} mt-2 resize-y py-3 leading-6`}
                                         />
                                     </Field>
-                                </div>
 
-                                <div
-                                    className="flex flex-wrap justify-end gap-2 border-t pt-4"
-                                    style={{ borderColor: "var(--border)" }}
-                                >
-                                    <button
-                                        type="button"
-                                        onClick={cancelEditing}
-                                        disabled={saving}
-                                        className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium disabled:opacity-50"
-                                        style={{
-                                            borderColor: "var(--border)",
-                                            color: "var(--text)",
-                                        }}
-                                    >
-                                        <X size={15} />
-                                        Cancel
-                                    </button>
+                                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                                        <Field label="Status" htmlFor="project-status">
+                                            <select
+                                                id="project-status"
+                                                name="status"
+                                                value={form.status}
+                                                onChange={updateForm}
+                                                className={field}
+                                            >
+                                                {projectStatuses.map((status) => (
+                                                    <option key={status} value={status}>
+                                                        {status}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </Field>
 
-                                    <button
-                                        type="submit"
-                                        disabled={saving || !form.name.trim()}
-                                        className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-                                        style={{ background: "var(--primary)" }}
-                                    >
-                                        <Save size={15} />
-                                        {saving ? "Saving..." : "Save changes"}
-                                    </button>
-                                </div>
-                            </form>
-                        )}
+                                        <Field label="Start date" htmlFor="project-start-date">
+                                            <input
+                                                id="project-start-date"
+                                                name="startDate"
+                                                type="date"
+                                                max={form.endDate || undefined}
+                                                value={form.startDate}
+                                                onChange={updateForm}
+                                                className={field}
+                                            />
+                                        </Field>
+
+                                        <Field label="End date" htmlFor="project-end-date">
+                                            <input
+                                                id="project-end-date"
+                                                name="endDate"
+                                                type="date"
+                                                min={form.startDate || undefined}
+                                                value={form.endDate}
+                                                onChange={updateForm}
+                                                className={field}
+                                            />
+                                        </Field>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 border-t border-[var(--border)] pt-5 sm:flex sm:justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={cancelEditing}
+                                            disabled={saving}
+                                            className={btnSecondary}
+                                        >
+                                            <X size={15} />
+                                            Cancel
+                                        </button>
+
+                                        <button
+                                            type="submit"
+                                            disabled={saving || !form.name.trim()}
+                                            className={btnPrimary}
+                                        >
+                                            {saving ? (
+                                                <Loader2 size={15} className="animate-spin" />
+                                            ) : (
+                                                <Save size={15} />
+                                            )}
+                                            {saving ? "Saving..." : "Save changes"}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+                        </div>
                     </section>
 
-                    {/* Related tasks */}
-                    <section
-                        className="overflow-hidden rounded-xl border"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                        }}
-                    >
-                        <div
-                            className="flex items-center justify-between gap-3 border-b px-5 py-4"
-                            style={{ borderColor: "var(--border)" }}
-                        >
-                            <div>
-                                <h2 className="font-semibold">Project tasks</h2>
-
-                                <p
-                                    className="mt-1 text-sm"
-                                    style={{ color: "var(--text-muted)" }}
-                                >
+                    {/* Project tasks */}
+                    <section className={`${panel} overflow-hidden`}>
+                        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-5 sm:px-6">
+                            <div className="min-w-0">
+                                <h2 className="flex items-center gap-2 font-semibold">
+                                    Project tasks
+                                    <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold tabular-nums text-[var(--text-muted)]">
+                                        {loadingTasks ? "…" : totalTasks}
+                                    </span>
+                                </h2>
+                                <p className="mt-1 text-sm text-[var(--text-muted)]">
                                     Tasks linked to this project.
                                 </p>
                             </div>
 
-                            <span
-                                className="rounded-full px-2.5 py-1 text-xs font-medium"
-                                style={{
-                                    background: "var(--surface-muted)",
-                                    color: "var(--text-muted)",
-                                }}
+                            <Link
+                                to="/dashboard/tasks"
+                                style={primaryLinkStyle}
+                                className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold hover:underline"
                             >
-                                {loadingTasks ? "..." : totalTasks}
-                            </span>
+                                All tasks
+                                <ArrowUpRight size={15} />
+                            </Link>
                         </div>
 
                         {taskError && (
                             <div
                                 role="alert"
-                                className="m-4 rounded-lg border p-3 text-sm"
-                                style={{
-                                    borderColor: "#f2b8b5",
-                                    background: "#fff4f2",
-                                    color: "#b42318",
-                                }}
+                                className="m-4 rounded-lg bg-[var(--danger-soft)] px-4 py-3 text-sm leading-5 text-[var(--danger)] sm:m-6"
                             >
                                 {taskError}
                             </div>
                         )}
 
                         {loadingTasks ? (
-                            <div
-                                className="flex items-center justify-center gap-2 p-10 text-sm"
-                                style={{ color: "var(--text-muted)" }}
-                            >
-                                <RefreshCw
-                                    size={17}
-                                    className="animate-spin"
+                            <div className="px-6 py-14 text-center">
+                                <Loader2
+                                    size={20}
+                                    className="mx-auto animate-spin text-[var(--primary)]"
                                 />
-                                Loading project tasks...
+                                <p className="mt-3 text-sm text-[var(--text-muted)]">
+                                    Loading project tasks...
+                                </p>
                             </div>
                         ) : tasks.length === 0 ? (
-                            <div className="px-5 py-12 text-center">
+                            <div className="px-6 py-14 text-center">
                                 <ClipboardList
-                                    size={28}
-                                    className="mx-auto"
-                                    style={{ color: "var(--text-muted)" }}
+                                    size={22}
+                                    aria-hidden="true"
+                                    className="mx-auto text-[var(--text-subtle)]"
                                 />
-
-                                <p className="mt-3 text-sm font-medium">
-                                    No tasks found
+                                <p className="mt-3 text-sm font-semibold">No tasks in this project</p>
+                                <p className="mx-auto mt-1 max-w-sm text-sm leading-5 text-[var(--text-muted)]">
+                                    Tasks you add to this project will show up here.
                                 </p>
-
-                                <p
-                                    className="mt-1 text-sm"
-                                    style={{ color: "var(--text-muted)" }}
-                                >
-                                    Tasks associated with this project will
-                                    appear here.
-                                </p>
-
-                                <Link
-                                    to="/dashboard/tasks"
-                                    className="mt-4 inline-flex items-center gap-2 text-sm font-medium"
-                                    style={{ color: "var(--primary)" }}
-                                >
-                                    View all tasks
-                                    <ArrowLeft
-                                        size={14}
-                                        className="rotate-180"
-                                    />
-                                </Link>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[560px] text-left text-sm">
-                                    <thead
-                                        style={{
-                                            background: "var(--surface-muted)",
-                                            color: "var(--text-muted)",
-                                        }}
-                                    >
+                                    <thead className="bg-[var(--surface-muted)] text-xs text-[var(--text-muted)]">
                                         <tr>
-                                            <th className="px-4 py-3 font-medium">
-                                                Task
-                                            </th>
-                                            <th className="px-4 py-3 font-medium">
-                                                Priority
-                                            </th>
-                                            <th className="px-4 py-3 font-medium">
-                                                Due date
-                                            </th>
-                                            <th className="px-4 py-3 font-medium">
-                                                Status
-                                            </th>
+                                            <th className="px-5 py-3 font-semibold sm:px-6">Task</th>
+                                            <th className="px-4 py-3 font-semibold">Priority</th>
+                                            <th className="px-4 py-3 font-semibold">Due date</th>
+                                            <th className="px-4 py-3 font-semibold">Status</th>
                                         </tr>
                                     </thead>
 
                                     <tbody>
                                         {tasks.map((task, index) => {
                                             const status =
-                                                task.status || "todo";
-
-                                            const priority =
-                                                task.priority || "medium";
+                                                TASK_STATUSES[task.status] || TASK_STATUSES.todo;
+                                            const priority = task.priority || "medium";
 
                                             return (
                                                 <tr
                                                     key={task._id || index}
-                                                    className="border-t"
-                                                    style={{
-                                                        borderColor:
-                                                            "var(--border)",
-                                                    }}
+                                                    className="border-t border-[var(--border)] align-top transition-colors duration-200 hover:bg-[var(--surface-muted)]"
                                                 >
-                                                    <td className="px-4 py-4">
+                                                    <td className="px-5 py-4 sm:px-6">
                                                         <Link
-                                                            to={`/dashboard/tasks/${task._id}`}
-                                                            className="font-medium hover:underline"
-                                                            style={{
-                                                                color: "var(--text)",
-                                                            }}
+                                                            to={`/dashboard/tasks/${encodeURIComponent(task._id)}`}
+                                                            style={textLinkStyle}
+                                                            className="font-semibold hover:underline"
                                                         >
-                                                            {task.title ||
-                                                                "Untitled task"}
+                                                            {task.title || "Untitled task"}
                                                         </Link>
 
                                                         {task.assignedTo && (
-                                                            <p
-                                                                className="mt-1 text-xs"
-                                                                style={{
-                                                                    color: "var(--text-muted)",
-                                                                }}
-                                                            >
-                                                                {getPersonName(
-                                                                    task.assignedTo
-                                                                )}
+                                                            <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                                                {getPersonName(task.assignedTo)}
                                                             </p>
                                                         )}
                                                     </td>
 
-                                                    <td className="px-4 py-4">
-                                                        <span
-                                                            className="font-medium capitalize"
-                                                            style={{
-                                                                color:
-                                                                    priority ===
-                                                                        "high"
-                                                                        ? "#dc2626"
-                                                                        : priority ===
-                                                                            "medium"
-                                                                            ? "#d97706"
-                                                                            : "var(--text-muted)",
-                                                            }}
-                                                        >
-                                                            {priority}
-                                                        </span>
+                                                    <td className={`px-4 py-4 capitalize ${priorityText[priority] || priorityText.medium}`}>
+                                                        {priority}
                                                     </td>
 
-                                                    <td
-                                                        className="whitespace-nowrap px-4 py-4"
-                                                        style={{
-                                                            color: "var(--text-muted)",
-                                                        }}
-                                                    >
+                                                    <td className="whitespace-nowrap px-4 py-4 text-[var(--text-muted)]">
                                                         {formatDate(task.dueDate)}
                                                     </td>
 
                                                     <td className="px-4 py-4">
-                                                        <span
-                                                            className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium"
-                                                            style={
-                                                                taskStatusStyles[
-                                                                status
-                                                                ] ||
-                                                                taskStatusStyles.todo
-                                                            }
-                                                        >
-                                                            {taskStatusLabels[
-                                                                status
-                                                            ] || status}
+                                                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                                            <span
+                                                                aria-hidden="true"
+                                                                className="h-2 w-2 rounded-full"
+                                                                style={{ background: status.color }}
+                                                            />
+                                                            {status.label}
                                                         </span>
                                                     </td>
                                                 </tr>
@@ -1243,155 +962,85 @@ export default function ProjectDetails() {
                     </section>
                 </div>
 
-                {/* Right sidebar */}
-                <aside className="space-y-5">
-                    <section
-                        className="rounded-xl border p-5"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                        }}
-                    >
-                        <h2 className="font-semibold">
-                            Project information
-                        </h2>
+                {/* Sidebar */}
+                <aside className="space-y-6 lg:sticky lg:top-4">
+                    <section className={`${panel} p-5 sm:p-6`}>
+                        <h2 className="font-semibold">Project information</h2>
 
-                        <div className="mt-5 space-y-5">
-                            <MetadataItem
-                                icon={FolderKanban}
-                                label="Status"
-                            >
-                                {project.status || "Planning"}
+                        <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">
+                            <MetadataItem icon={CheckCircle2} label="Status">
+                                {statusKey}
                             </MetadataItem>
 
-                            <MetadataItem
-                                icon={FolderKanban}
-                                label="Workspace"
-                            >
+                            <MetadataItem icon={FolderKanban} label="Workspace">
                                 {workspaceName}
                             </MetadataItem>
 
-                            <MetadataItem
-                                icon={CalendarDays}
-                                label="Start date"
-                            >
+                            <MetadataItem icon={CalendarDays} label="Start date">
                                 {formatDate(project.startDate)}
                             </MetadataItem>
 
-                            <MetadataItem
-                                icon={CalendarDays}
-                                label="End date"
-                            >
-                                {formatDate(project.endDate)}
+                            <MetadataItem icon={CalendarDays} label="End date">
+                                <span className={isPastEndDate ? "text-[var(--danger)]" : ""}>
+                                    {formatDate(project.endDate)}
+                                </span>
+
+                                {isPastEndDate && (
+                                    <span className="mt-0.5 block text-xs font-medium text-[var(--danger)]">
+                                        Past end date
+                                    </span>
+                                )}
                             </MetadataItem>
 
-                            <MetadataItem
-                                icon={UserRound}
-                                label="Created by"
-                            >
-                                {projectCreator}
+                            <MetadataItem icon={UserRound} label="Created by">
+                                {getPersonName(creator)}
 
-                                {project.createdBy &&
-                                    typeof project.createdBy === "object" &&
-                                    project.createdBy.email && (
-                                        <span
-                                            className="mt-1 block break-all text-xs font-normal"
-                                            style={{
-                                                color: "var(--text-muted)",
-                                            }}
-                                        >
-                                            {project.createdBy.email}
-                                        </span>
-                                    )}
+                                {creator && typeof creator === "object" && creator.email && (
+                                    <span className="mt-0.5 block break-all text-xs font-normal text-[var(--text-muted)]">
+                                        {creator.email}
+                                    </span>
+                                )}
                             </MetadataItem>
                         </div>
                     </section>
 
-                    <section
-                        className="rounded-xl border p-5"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                        }}
-                    >
+                    <section className={`${panel} p-5 sm:p-6`}>
                         <h2 className="font-semibold">Task completion</h2>
 
-                        <p className="mt-4 text-3xl font-semibold">
+                        <p
+                            className="mt-4 text-3xl font-bold tabular-nums tracking-tight"
+                            style={displayFont}
+                        >
                             {loadingTasks ? "—" : `${progress}%`}
                         </p>
 
-                        <div
-                            className="mt-3 h-2 overflow-hidden rounded-full"
-                            style={{ background: "var(--surface-muted)" }}
-                        >
-                            <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                    width: `${loadingTasks ? 0 : progress}%`,
-                                    background: "var(--primary)",
-                                }}
+                        <div className="mt-3">
+                            <ProgressBar
+                                value={loadingTasks ? 0 : progress}
+                                label="Task completion"
                             />
                         </div>
 
-                        <p
-                            className="mt-3 text-sm"
-                            style={{ color: "var(--text-muted)" }}
-                        >
+                        <p className="mt-3 text-sm text-[var(--text-muted)]">
                             {loadingTasks
-                                ? "Calculating task completion..."
+                                ? "Calculating..."
                                 : `${completedTasks} of ${totalTasks} tasks completed.`}
                         </p>
                     </section>
 
-                    <section
-                        className="rounded-xl border p-5"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                        }}
-                    >
-                        <h2 className="font-semibold">Project activity</h2>
+                    <section className={`${panel} p-5 sm:p-6`}>
+                        <h2 className="font-semibold">Activity</h2>
 
-                        <div className="mt-5 space-y-5">
-                            <MetadataItem
-                                icon={Clock3}
-                                label="Created"
-                            >
+                        <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">
+                            <MetadataItem icon={Clock3} label="Created">
                                 {formatDateTime(project.createdAt)}
                             </MetadataItem>
 
-                            <MetadataItem
-                                icon={Clock3}
-                                label="Last updated"
-                            >
+                            <MetadataItem icon={RefreshCw} label="Last updated">
                                 {formatDateTime(project.updatedAt)}
                             </MetadataItem>
                         </div>
                     </section>
-
-                    <Link
-                        to="/dashboard/tasks"
-                        className="flex items-center justify-between rounded-xl border p-4 text-sm font-medium"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                            color: "var(--text)",
-                        }}
-                    >
-                        <span className="flex items-center gap-2">
-                            <ClipboardList
-                                size={17}
-                                style={{ color: "var(--primary)" }}
-                            />
-                            View all tasks
-                        </span>
-
-                        <ArrowLeft
-                            size={16}
-                            className="rotate-180"
-                            style={{ color: "var(--text-muted)" }}
-                        />
-                    </Link>
                 </aside>
             </div>
         </div>

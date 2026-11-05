@@ -1,63 +1,50 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+
 import {
-    Search,
-    RefreshCw,
-    ClipboardList,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { Link } from "react-router-dom";
+import { gsap } from "gsap";
+import {
     AlertCircle,
-    Plus,
-    X,
-    ArrowUpRight,
-    CalendarDays,
-    UserRound,
+    ChevronDown,
+    Loader2,
     Paperclip,
-    Tag,
-    CheckCircle2,
+    Plus,
+    RefreshCw,
+    Search,
+    X,
 } from "lucide-react";
 
 import { useWorkspace } from "../../context/WorkspaceContext.jsx";
 import { getTasks, createTask } from "../../services/task.service.js";
 import api from "../../api/axios";
 
-const statusOptions = [
-    { label: "All statuses", value: "All" },
-    { label: "To Do", value: "todo" },
-    { label: "In Progress", value: "inProgress" },
-    { label: "In Review", value: "review" },
-    { label: "Completed", value: "completed" },
+/* Same loader id as Login / Register / Overview, so the font is only added once */
+const DISPLAY_FONT_ID = "login-display-font";
+const DISPLAY_FONT_URL =
+    "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
+
+const displayFont = {
+    fontFamily:
+        '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
+};
+
+/* index.css sets an unlayered color on <a>, so link colors are inline */
+const taskLinkStyle = { color: "var(--text)" };
+
+const STATUSES = [
+    { key: "todo", label: "To do", color: "var(--text-subtle)" },
+    { key: "inProgress", label: "In progress", color: "var(--primary)" },
+    { key: "review", label: "In review", color: "var(--warning, #d97706)" },
+    { key: "completed", label: "Completed", color: "var(--success)" },
 ];
 
-const statusLabels = {
-    todo: "To Do",
-    inProgress: "In Progress",
-    review: "In Review",
-    completed: "Completed",
-};
-
-const statusStyles = {
-    todo: {
-        background: "var(--surface-muted)",
-        color: "var(--text-muted)",
-    },
-    inProgress: {
-        background: "var(--primary-soft, #e1f2ef)",
-        color: "var(--primary)",
-    },
-    review: {
-        background: "#fff7ed",
-        color: "#c2410c",
-    },
-    completed: {
-        background: "#ecfdf5",
-        color: "#047857",
-    },
-};
-
-const priorityStyles = {
-    high: { color: "#dc2626" },
-    medium: { color: "#d97706" },
-    low: { color: "var(--text-muted)" },
-};
+const STATUS_BY_KEY = Object.fromEntries(STATUSES.map((s) => [s.key, s]));
 
 const initialTaskForm = {
     title: "",
@@ -67,6 +54,21 @@ const initialTaskForm = {
     priority: "medium",
     dueDate: "",
 };
+
+const fieldBase =
+    "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm text-[var(--text)] " +
+    "outline-none transition-colors duration-150 hover:border-[var(--border-strong)] " +
+    "placeholder:text-[var(--text-subtle)] focus:border-[var(--primary)] " +
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] " +
+    "disabled:cursor-not-allowed disabled:opacity-60";
+
+const field = `${fieldBase} h-11`;
+const dialogField = `${fieldBase} mt-1.5 h-11`;
+
+const panel = "rounded-2xl border border-[var(--border)] bg-[var(--surface)]";
+
+const focusRing =
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]";
 
 const getId = (value) => {
     if (!value) return "";
@@ -84,10 +86,7 @@ function getList(response, key) {
     for (let depth = 0; depth < 4; depth += 1) {
         if (Array.isArray(result)) return result;
         if (!result || typeof result !== "object") break;
-
-        if (key && Array.isArray(result[key])) {
-            return result[key];
-        }
+        if (key && Array.isArray(result[key])) return result[key];
 
         if (result.data !== undefined) {
             result = result.data;
@@ -100,35 +99,9 @@ function getList(response, key) {
     return [];
 }
 
-function getTaskResponse(response) {
-    let result = response?.data ?? response;
-
-    for (let depth = 0; depth < 4; depth += 1) {
-        if (!result || typeof result !== "object") return null;
-        if (result._id) return result;
-
-        if (result.task) {
-            result = result.task;
-            continue;
-        }
-
-        if (result.data !== undefined) {
-            result = result.data;
-            continue;
-        }
-
-        break;
-    }
-
-    return null;
-}
-
 function getPersonName(person) {
     if (!person) return "Unassigned";
-
-    if (typeof person === "string") {
-        return "User details unavailable";
-    }
+    if (typeof person === "string") return "User details unavailable";
 
     return (
         person.fullName ||
@@ -142,10 +115,7 @@ function getPersonName(person) {
 
 function getProjectName(project) {
     if (!project) return "Unknown project";
-
-    if (typeof project === "string") {
-        return "Project details unavailable";
-    }
+    if (typeof project === "string") return "Project details unavailable";
 
     return project.name || project.title || "Unknown project";
 }
@@ -154,7 +124,6 @@ function formatDate(value) {
     if (!value) return "No due date";
 
     const date = new Date(value);
-
     if (Number.isNaN(date.getTime())) return "No due date";
 
     return new Intl.DateTimeFormat("en-IN", {
@@ -168,7 +137,6 @@ function isOverdue(task) {
     if (!task.dueDate || task.status === "completed") return false;
 
     const date = new Date(task.dueDate);
-
     if (Number.isNaN(date.getTime())) return false;
 
     const today = new Date();
@@ -182,13 +150,37 @@ function formatPriority(priority = "medium") {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
 }
 
+/* ---------------------------------------------------------------
+   Consistent select control
+---------------------------------------------------------------- */
+
+function FilterSelect({ className = "", children, ...props }) {
+    return (
+        <div className={`relative min-w-0 ${className}`}>
+            <select
+                {...props}
+                className={`${field} appearance-none pr-10`}
+            >
+                {children}
+            </select>
+
+            <ChevronDown
+                size={15}
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+            />
+        </div>
+    );
+}
+
+/* ---------------------------------------------------------------
+   Tasks
+---------------------------------------------------------------- */
+
 export default function Tasks() {
     const {
-        workspaces,
         currentWorkspace,
         currentWorkspaceId: workspaceId,
-        setCurrentWorkspace,
-        loading: loadingWorkspaces,
         isOwner,
         canManageMembers,
     } = useWorkspace();
@@ -212,79 +204,131 @@ export default function Tasks() {
     const [createError, setCreateError] = useState("");
     const [createMessage, setCreateMessage] = useState("");
 
-    const [loadingAction, setLoadingAction] = useState(false);
+    const rootRef = useRef(null);
+    const requestRef = useRef(0);
 
-    const loadTasks = useCallback(async () => {
-        if (!workspaceId) {
-            setTasks([]);
+    useEffect(() => {
+        if (document.getElementById(DISPLAY_FONT_ID)) return;
+
+        const link = document.createElement("link");
+        link.id = DISPLAY_FONT_ID;
+        link.rel = "stylesheet";
+        link.href = DISPLAY_FONT_URL;
+        document.head.appendChild(link);
+    }, []);
+
+    /* One quiet fade on page load. Nothing else moves on its own. */
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+
+        if (
+            !root ||
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
             return;
         }
 
-        setLoadingAction(true);
-        setError("");
+        const ctx = gsap.context(() => {
+            gsap.from(root, {
+                opacity: 0,
+                y: 10,
+                duration: 0.5,
+                ease: "power3.out",
+                clearProps: "transform,opacity",
+            });
+        }, root);
 
-        try {
-            const response = await getTasks({ workspaceId });
-            setTasks(getList(response, "tasks"));
-        } catch (err) {
-            setError(
-                err?.response?.data?.message ||
-                err?.message ||
-                "Unable to load tasks."
-            );
-        } finally {
-            setLoadingAction(false);
-        }
-    }, [workspaceId]);
+        return () => ctx.revert();
+    }, []);
 
-    useEffect(() => {
-        let active = true;
+    /* Load tasks and discard stale workspace responses */
+    const loadTasks = useCallback(
+        async (mode = "initial") => {
+            const requestId = ++requestRef.current;
 
-        const fetchTasks = async () => {
             if (!workspaceId) {
                 setTasks([]);
                 setLoadingTasks(false);
+                setRefreshing(false);
                 return;
             }
 
-            setTasks([]);
-            setLoadingTasks(true);
+            if (mode === "initial") {
+                setTasks([]);
+                setLoadingTasks(true);
+            } else {
+                setRefreshing(true);
+            }
+
             setError("");
-            setSearch("");
-            setStatusFilter("All");
-            setAssigneeFilter("All");
-            setCreateOpen(false);
-            setCreateError("");
-            setCreateMessage("");
 
             try {
                 const response = await getTasks({ workspaceId });
 
-                if (active) {
-                    setTasks(getList(response, "tasks"));
-                }
-            } catch (err) {
-                if (!active) return;
+                if (requestId !== requestRef.current) return;
 
-                setTasks([]);
+                setTasks(getList(response, "tasks"));
+            } catch (err) {
+                if (requestId !== requestRef.current) return;
+
+                if (mode === "initial") setTasks([]);
+
                 setError(
                     err?.response?.data?.message ||
                     err?.message ||
                     "Unable to load tasks."
                 );
             } finally {
-                if (active) setLoadingTasks(false);
+                if (requestId === requestRef.current) {
+                    setLoadingTasks(false);
+                    setRefreshing(false);
+                }
+            }
+        },
+        [workspaceId]
+    );
+
+    /* Reset filters when the active workspace changes */
+    useEffect(() => {
+        setSearch("");
+        setStatusFilter("All");
+        setAssigneeFilter("All");
+        setCreateOpen(false);
+        setCreateError("");
+        setCreateMessage("");
+
+        loadTasks("initial");
+
+        return () => {
+            requestRef.current += 1;
+        };
+    }, [loadTasks]);
+
+    /* Escape closes dialog */
+    useEffect(() => {
+        if (!createOpen) return;
+
+        const onKey = (event) => {
+            if (event.key === "Escape" && !creatingTask) {
+                setCreateOpen(false);
             }
         };
 
-        fetchTasks();
+        window.addEventListener("keydown", onKey);
 
-        return () => {
-            active = false;
-        };
-    }, [workspaceId]);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [createOpen, creatingTask]);
 
-    // Build the list of users who can receive tasks.
+    /* Auto-dismiss success message */
+    useEffect(() => {
+        if (!createMessage) return;
+
+        const timer = setTimeout(() => setCreateMessage(""), 4000);
+
+        return () => clearTimeout(timer);
+    }, [createMessage]);
+
+    /* Workspace members */
     const workspaceMembers = useMemo(() => {
         const result = [];
         const seen = new Set();
@@ -293,10 +337,10 @@ export default function Tasks() {
             if (!person || typeof person !== "object") return;
 
             const id = getId(person);
-
             if (!id || seen.has(id)) return;
 
             seen.add(id);
+
             result.push({
                 _id: id,
                 name: getPersonName(person),
@@ -313,7 +357,7 @@ export default function Tasks() {
         return result;
     }, [currentWorkspace]);
 
-    // Assignee options are derived from the tasks returned by the API.
+    /* Assignee filter options */
     const assignees = useMemo(() => {
         const users = new Map();
 
@@ -337,50 +381,49 @@ export default function Tasks() {
         );
     }, [tasks]);
 
+    /* Task filtering */
     const filteredTasks = useMemo(() => {
         const query = search.trim().toLowerCase();
 
         return tasks.filter((task) => {
-            const projectName = getProjectName(task.project);
-            const assigneeName = getPersonName(task.assignedTo);
-            const creatorName = getPersonName(task.createdBy);
-
             const matchesSearch =
                 (task.title || "").toLowerCase().includes(query) ||
                 (task.description || "").toLowerCase().includes(query) ||
-                projectName.toLowerCase().includes(query) ||
-                assigneeName.toLowerCase().includes(query) ||
-                creatorName.toLowerCase().includes(query);
+                getProjectName(task.project).toLowerCase().includes(query) ||
+                getPersonName(task.assignedTo).toLowerCase().includes(query) ||
+                getPersonName(task.createdBy).toLowerCase().includes(query);
 
             const matchesStatus =
-                statusFilter === "All" ||
-                task.status === statusFilter;
+                statusFilter === "All" || task.status === statusFilter;
+
+            const assigneeId = getId(task.assignedTo);
 
             const matchesAssignee =
                 assigneeFilter === "All" ||
-                getId(task.assignedTo) === assigneeFilter;
+                (assigneeFilter === "Unassigned"
+                    ? !assigneeId
+                    : assigneeId === assigneeFilter);
 
             return matchesSearch && matchesStatus && matchesAssignee;
         });
     }, [tasks, search, statusFilter, assigneeFilter]);
 
-    const statistics = useMemo(() => {
-        const completed = tasks.filter(
-            (task) => task.status === "completed"
-        ).length;
-
-        const inProgress = tasks.filter(
-            (task) => task.status === "inProgress"
-        ).length;
-
+    /* Task statistics */
+    const stats = useMemo(() => {
         const overdue = tasks.filter(isOverdue).length;
 
-        return {
-            total: tasks.length,
-            completed,
-            inProgress,
-            overdue,
-        };
+        return [
+            { label: "Total tasks", value: tasks.length },
+            {
+                label: "Completed",
+                value: tasks.filter((t) => t.status === "completed").length,
+            },
+            {
+                label: "In progress",
+                value: tasks.filter((t) => t.status === "inProgress").length,
+            },
+            { label: "Overdue", value: overdue, alert: overdue > 0 },
+        ];
     }, [tasks]);
 
     const updateTaskForm = (event) => {
@@ -392,9 +435,10 @@ export default function Tasks() {
         }));
     };
 
+    /* Load projects for create-task dialog */
     const loadProjects = async () => {
         if (!workspaceId) {
-            setCreateError("Please select a workspace.");
+            setCreateError("No active workspace found. Please try again.");
             return;
         }
 
@@ -447,8 +491,10 @@ export default function Tasks() {
         await loadProjects();
     };
 
+    /* Create task */
     const handleCreateTask = async (event) => {
         event.preventDefault();
+
         setCreateError("");
         setCreateMessage("");
 
@@ -458,7 +504,7 @@ export default function Tasks() {
         }
 
         if (!workspaceId || !taskForm.project) {
-            setCreateError("Select a workspace and project.");
+            setCreateError("Please select a project.");
             return;
         }
 
@@ -491,7 +537,7 @@ export default function Tasks() {
         try {
             setCreatingTask(true);
 
-            const payload = {
+            await createTask({
                 title: taskForm.title.trim(),
                 description: taskForm.description.trim(),
                 workspace: workspaceId,
@@ -503,17 +549,13 @@ export default function Tasks() {
                 ...(taskForm.dueDate && {
                     dueDate: taskForm.dueDate,
                 }),
-            };
-
-            await createTask(payload);
+            });
 
             setCreateOpen(false);
             setTaskForm(initialTaskForm);
-            setCreateMessage("Task created successfully.");
+            setCreateMessage("Task created.");
 
-            // Reload from the backend so populated fields are displayed.
-            const response = await getTasks({ workspaceId });
-            setTasks(getList(response, "tasks"));
+            await loadTasks("refresh");
         } catch (err) {
             setCreateError(
                 err?.response?.data?.message ||
@@ -525,326 +567,249 @@ export default function Tasks() {
         }
     };
 
-    const handleRefresh = async () => {
-        if (!workspaceId || refreshing || loadingTasks) return;
-
-        setRefreshing(true);
-        setError("");
-
-        try {
-            const response = await getTasks({ workspaceId });
-            setTasks(getList(response, "tasks"));
-        } catch (err) {
-            setError(
-                err?.response?.data?.message ||
-                err?.message ||
-                "Unable to refresh tasks."
-            );
-        } finally {
-            setRefreshing(false);
-        }
-    };
+    const columnCount = canViewAllTasks ? 8 : 7;
 
     return (
         <div
-            className="mx-auto max-w-7xl space-y-6"
-            style={{ color: "var(--text)" }}
+            ref={rootRef}
+            className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 text-[var(--text)] sm:space-y-7 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
         >
-            {/* Heading */}
-            <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">
-                        {canViewAllTasks ? "Workspace Tasks" : "My Tasks"}
+            {/* Page heading and primary actions */}
+            <header className="flex flex-col gap-5 border-b border-[var(--border)] pb-6 xl:flex-row xl:items-end xl:justify-between">
+                <div className="min-w-0">
+                    <p className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)] sm:text-[11px]">
+                        <span className="size-1.5 rounded-full bg-[var(--primary)]" />
+                        Task management
+                    </p>
+
+                    <h1
+                        className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl"
+                        style={displayFont}
+                    >
+                        {canViewAllTasks ? "Workspace tasks" : "My tasks"}
                     </h1>
 
-                    <p
-                        className="mt-1 text-sm"
-                        style={{ color: "var(--text-muted)" }}
-                    >
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
                         {canViewAllTasks
-                            ? "View and manage tasks assigned across your workspace."
-                            : "View tasks assigned to you in this workspace."}
+                            ? "Manage, organize and track every task in this workspace."
+                            : "Keep track of the work assigned to you in this workspace."}
                     </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                {/* Workspace selector removed. Active workspace comes from WorkspaceContext. */}
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
+                    <button
+                        type="button"
+                        onClick={() => loadTasks("refresh")}
+                        disabled={!workspaceId || refreshing || loadingTasks}
+                        className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--text)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+                    >
+                        <RefreshCw
+                            size={15}
+                            className={refreshing ? "animate-spin" : ""}
+                        />
+                        Refresh
+                    </button>
+
                     {isOwner && (
                         <button
                             type="button"
                             onClick={handleOpenCreate}
                             disabled={!workspaceId}
-                            className="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-50"
-                            style={{ background: "var(--primary)" }}
+                            className={`btn-primary inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
                         >
-                            <Plus size={17} />
-                            Create Task
+                            <Plus size={16} />
+                            Create task
                         </button>
                     )}
+                </div>
+            </header>
+
+            {/* Messages */}
+            {createMessage && (
+                <p
+                    role="status"
+                    className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 text-sm font-medium text-[var(--success)] sm:px-5"
+                >
+                    {createMessage}
+                </p>
+            )}
+
+            {error && (
+                <div
+                    role="alert"
+                    className="flex items-start gap-3 rounded-xl border border-[var(--danger)]/15 bg-[var(--danger-soft)] px-4 py-3.5 text-sm leading-5 text-[var(--danger)] sm:px-5"
+                >
+                    <AlertCircle size={17} className="mt-0.5 shrink-0" />
+
+                    <span className="flex-1">{error}</span>
 
                     <button
                         type="button"
-                        onClick={handleRefresh}
-                        disabled={!workspaceId || refreshing || loadingTasks}
-                        className="inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium disabled:opacity-50"
-                        style={{
-                            borderColor: "var(--border)",
-                            background: "var(--surface)",
-                        }}
+                        onClick={() => loadTasks("initial")}
+                        className="shrink-0 font-semibold hover:underline"
                     >
-                        <RefreshCw
-                            size={16}
-                            className={refreshing ? "animate-spin" : ""}
-                        />
-                        Refresh
+                        Try again
                     </button>
                 </div>
-            </section>
-
-            {createMessage && (
-                <div
-                    role="status"
-                    className="rounded-lg border px-4 py-3 text-sm"
-                    style={{
-                        borderColor: "var(--border)",
-                        background: "var(--surface)",
-                        color: "var(--primary)",
-                    }}
-                >
-                    {createMessage}
-                </div>
             )}
-
-            {/* Workspace selector */}
-            <section
-                className="rounded-xl border p-4"
-                style={{
-                    background: "var(--surface)",
-                    borderColor: "var(--border)",
-                }}
-            >
-                <label
-                    htmlFor="tasks-workspace"
-                    className="mb-2 block text-sm font-medium"
-                >
-                    Workspace
-                </label>
-
-                <select
-                    id="tasks-workspace"
-                    value={workspaceId || ""}
-                    onChange={(event) =>
-                        setCurrentWorkspace(event.target.value)
-                    }
-                    disabled={loadingWorkspaces || workspaces.length === 0}
-                    className="w-full max-w-md rounded-lg border px-3.5 py-2.5 text-sm outline-none"
-                    style={{
-                        background: "var(--surface)",
-                        color: "var(--text)",
-                        borderColor: "var(--border)",
-                    }}
-                >
-                    {workspaces.map((workspace) => (
-                        <option
-                            key={getId(workspace)}
-                            value={getId(workspace)}
-                        >
-                            {workspace.name}
-                        </option>
-                    ))}
-                </select>
-            </section>
 
             {/* Statistics */}
-            <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                {[
-                    {
-                        label: "Total tasks",
-                        value: statistics.total,
-                        icon: ClipboardList,
-                    },
-                    {
-                        label: "Completed",
-                        value: statistics.completed,
-                        icon: CheckCircle2,
-                    },
-                    {
-                        label: "In progress",
-                        value: statistics.inProgress,
-                        icon: RefreshCw,
-                    },
-                    {
-                        label: "Overdue",
-                        value: statistics.overdue,
-                        icon: AlertCircle,
-                    },
-                ].map((item) => {
-                    const Icon = item.icon;
+            <section
+                aria-label="Task statistics"
+                className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+            >
+                {stats.map((stat) => (
+                    <article
+                        key={stat.label}
+                        className={`${panel} flex min-h-[112px] flex-col justify-between p-4 sm:p-5`}
+                    >
+                        <p className="text-xs font-medium text-[var(--text-muted)] sm:text-sm">
+                            {stat.label}
+                        </p>
 
-                    return (
-                        <div
-                            key={item.label}
-                            className="rounded-xl border p-4 sm:p-5"
-                            style={{
-                                background: "var(--surface)",
-                                borderColor: "var(--border)",
-                            }}
+                        <p
+                            className={`mt-3 text-3xl font-bold tabular-nums tracking-tight ${stat.alert
+                                    ? "text-[var(--danger)]"
+                                    : "text-[var(--text)]"
+                                }`}
+                            style={displayFont}
                         >
-                            <div className="flex items-center justify-between gap-2">
-                                <p
-                                    className="text-sm"
-                                    style={{ color: "var(--text-muted)" }}
-                                >
-                                    {item.label}
-                                </p>
-                                <Icon
-                                    size={18}
-                                    style={{ color: "var(--primary)" }}
-                                />
-                            </div>
+                            {loadingTasks ? "—" : stat.value}
+                        </p>
+                    </article>
+                ))}
+            </section>
 
-                            <p className="mt-3 text-2xl font-semibold">
-                                {loadingTasks ? "—" : item.value}
+            {/* Table with filters */}
+            <section className={`${panel} min-w-0 overflow-hidden`}>
+                <div className="space-y-4 border-b border-[var(--border)] p-4 sm:p-5">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-sm font-semibold sm:text-base">
+                                {canViewAllTasks ? "All tasks" : "Assigned to me"}
+                            </h2>
+
+                            <p className="mt-1 text-xs text-[var(--text-muted)] sm:text-sm">
+                                {loadingTasks
+                                    ? "Loading tasks..."
+                                    : `${filteredTasks.length} ${filteredTasks.length === 1
+                                        ? "task"
+                                        : "tasks"
+                                    } found`}
                             </p>
                         </div>
-                    );
-                })}
-            </section>
 
-            {/* Search and filters */}
-            <section className="flex flex-col gap-3 sm:flex-row">
-                <div className="relative min-w-0 flex-1">
-                    <Search
-                        size={18}
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2"
-                        style={{ color: "var(--text-muted)" }}
-                    />
+                        {(search ||
+                            statusFilter !== "All" ||
+                            assigneeFilter !== "All") && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearch("");
+                                        setStatusFilter("All");
+                                        setAssigneeFilter("All");
+                                    }}
+                                    className="self-start text-xs font-semibold text-[var(--primary)] hover:underline sm:self-auto"
+                                >
+                                    Clear filters
+                                </button>
+                            )}
+                    </div>
 
-                    <input
-                        type="search"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search title, project, assignee..."
-                        className="w-full rounded-lg border py-2.5 pl-10 pr-4 text-sm outline-none"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                            color: "var(--text)",
-                        }}
-                    />
-                </div>
-
-                <select
-                    aria-label="Filter tasks by status"
-                    value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
-                    className="rounded-lg border px-4 py-2.5 text-sm outline-none"
-                    style={{
-                        background: "var(--surface)",
-                        borderColor: "var(--border)",
-                        color: "var(--text)",
-                    }}
-                >
-                    {statusOptions.map((status) => (
-                        <option key={status.value} value={status.value}>
-                            {status.label}
-                        </option>
-                    ))}
-                </select>
-
-                {canViewAllTasks && (
-                    <select
-                        aria-label="Filter tasks by assignee"
-                        value={assigneeFilter}
-                        onChange={(event) =>
-                            setAssigneeFilter(event.target.value)
-                        }
-                        className="rounded-lg border px-4 py-2.5 text-sm outline-none"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                            color: "var(--text)",
-                        }}
+                    <div
+                        className={`grid grid-cols-1 gap-2.5 ${canViewAllTasks
+                                ? "lg:grid-cols-[minmax(240px,1fr)_190px_210px]"
+                                : "sm:grid-cols-[minmax(240px,1fr)_190px]"
+                            }`}
                     >
-                        <option value="All">All assignees</option>
-                        <option value="Unassigned">Unassigned</option>
+                        <div className="relative min-w-0 flex-1">
+                            <Search
+                                size={16}
+                                aria-hidden="true"
+                                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-subtle)]"
+                            />
 
-                        {assignees.map((person) => (
-                            <option key={person.id} value={person.id}>
-                                {person.name}
-                            </option>
-                        ))}
-                    </select>
-                )}
-            </section>
+                            <input
+                                type="search"
+                                aria-label="Search tasks"
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search by title, project or person"
+                                className={`${field} pl-10`}
+                            />
+                        </div>
 
-            {/* Errors */}
-            {(error || loadingAction) && (
-                <div
-                    role={error ? "alert" : "status"}
-                    className="flex items-start gap-3 rounded-lg border p-4 text-sm"
-                    style={{
-                        borderColor: error ? "#dc7777" : "var(--border)",
-                        background: "var(--surface)",
-                        color: error ? "#c24141" : "var(--text-muted)",
-                    }}
-                >
-                    {error ? (
-                        <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                    ) : (
-                        <RefreshCw
-                            size={18}
-                            className="animate-spin"
-                        />
-                    )}
-                    <span>{error || "Refreshing tasks..."}</span>
-                </div>
-            )}
-
-            {/* Task table */}
-            <section
-                className="overflow-hidden rounded-xl border"
-                style={{
-                    background: "var(--surface)",
-                    borderColor: "var(--border)",
-                }}
-            >
-                <div
-                    className="border-b px-5 py-4"
-                    style={{ borderColor: "var(--border)" }}
-                >
-                    <h2 className="font-semibold">
-                        {canViewAllTasks ? "All workspace tasks" : "Tasks assigned to me"}
-                    </h2>
-
-                    <p
-                        className="mt-1 text-sm"
-                        style={{ color: "var(--text-muted)" }}
-                    >
-                        {loadingTasks
-                            ? "Loading tasks..."
-                            : `${filteredTasks.length} tasks found`}
-                    </p>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1050px] text-left text-sm">
-                        <thead
-                            style={{
-                                background: "var(--surface-muted)",
-                                color: "var(--text-muted)",
-                            }}
+                        <FilterSelect
+                            aria-label="Filter tasks by status"
+                            value={statusFilter}
+                            onChange={(event) =>
+                                setStatusFilter(event.target.value)
+                            }
                         >
+                            <option value="All">All statuses</option>
+
+                            {STATUSES.map((status) => (
+                                <option key={status.key} value={status.key}>
+                                    {status.label}
+                                </option>
+                            ))}
+                        </FilterSelect>
+
+                        {canViewAllTasks && (
+                            <FilterSelect
+                                aria-label="Filter tasks by assignee"
+                                value={assigneeFilter}
+                                onChange={(event) =>
+                                    setAssigneeFilter(event.target.value)
+                                }
+                            >
+                                <option value="All">All assignees</option>
+                                <option value="Unassigned">Unassigned</option>
+
+                                {assignees.map((person) => (
+                                    <option key={person.id} value={person.id}>
+                                        {person.name}
+                                    </option>
+                                ))}
+                            </FilterSelect>
+                        )}
+                    </div>
+                </div>
+
+                {/* Task table */}
+                <div className="max-w-full overflow-x-auto">
+                    <table className="w-full min-w-[1000px] table-auto text-left text-sm">
+                        <thead className="bg-[var(--surface-muted)] text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
                             <tr>
-                                <th className="px-4 py-3 font-medium">Task</th>
-                                <th className="px-4 py-3 font-medium">Project</th>
-                                <th className="px-4 py-3 font-medium">Assigned to</th>
+                                <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
+                                    Task
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
+                                    Project
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
+                                    Assigned to
+                                </th>
+
                                 {canViewAllTasks && (
-                                    <th className="px-4 py-3 font-medium">Created by</th>
+                                    <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
+                                        Created by
+                                    </th>
                                 )}
-                                <th className="px-4 py-3 font-medium">Priority</th>
-                                <th className="px-4 py-3 font-medium">Due date</th>
-                                <th className="px-4 py-3 font-medium">Status</th>
-                                <th className="px-4 py-3 font-medium">Files / Labels</th>
+
+                                <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
+                                    Priority
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
+                                    Due date
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
+                                    Status
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
+                                    Labels
+                                </th>
                             </tr>
                         </thead>
 
@@ -852,183 +817,176 @@ export default function Tasks() {
                             {loadingTasks ? (
                                 <tr>
                                     <td
-                                        colSpan={canViewAllTasks ? 8 : 7}
-                                        className="px-5 py-14 text-center"
+                                        colSpan={columnCount}
+                                        className="px-4 py-16 text-center"
                                     >
-                                        <RefreshCw
+                                        <Loader2
                                             size={20}
-                                            className="mx-auto animate-spin"
-                                            style={{ color: "var(--primary)" }}
+                                            className="mx-auto animate-spin text-[var(--primary)]"
                                         />
-                                        <p
-                                            className="mt-3 text-sm"
-                                            style={{ color: "var(--text-muted)" }}
-                                        >
+
+                                        <p className="mt-3 text-sm text-[var(--text-muted)]">
                                             Loading tasks...
                                         </p>
                                     </td>
                                 </tr>
                             ) : filteredTasks.length ? (
                                 filteredTasks.map((task) => {
-                                    const status = task.status || "todo";
+                                    const status =
+                                        STATUS_BY_KEY[task.status] ||
+                                        STATUS_BY_KEY.todo;
+
                                     const priority = task.priority || "medium";
                                     const overdue = isOverdue(task);
+                                    const taskId = getId(task);
+
                                     const labels = Array.isArray(task.labels)
                                         ? task.labels
                                         : [];
-                                    const attachments = Array.isArray(task.attachments)
+
+                                    const attachments = Array.isArray(
+                                        task.attachments
+                                    )
                                         ? task.attachments
                                         : [];
 
                                     return (
                                         <tr
-                                            key={getId(task)}
-                                            className="border-t align-top hover:bg-[var(--surface-muted)]"
-                                            style={{ borderColor: "var(--border)" }}
+                                            key={taskId || task.title}
+                                            className="border-t border-[var(--border)] align-middle transition-colors duration-150 hover:bg-[var(--surface-muted)]"
                                         >
-                                            <td className="max-w-xs px-4 py-4">
-                                                <Link
-                                                    to={`/dashboard/tasks/${getId(task)}`}
-                                                    className="inline-flex items-center gap-1 font-medium hover:underline"
-                                                    style={{ color: "var(--text)" }}
-                                                >
-                                                    <span className="break-words">
+                                            <td className="max-w-[280px] px-4 py-4">
+                                                {taskId ? (
+                                                    <Link
+                                                        to={`/dashboard/tasks/${encodeURIComponent(
+                                                            taskId
+                                                        )}`}
+                                                        className="font-semibold hover:underline"
+                                                        style={taskLinkStyle}
+                                                    >
+                                                        {task.title || "Untitled task"}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="font-semibold">
                                                         {task.title || "Untitled task"}
                                                     </span>
-                                                    <ArrowUpRight
-                                                        size={14}
-                                                        className="shrink-0"
-                                                    />
-                                                </Link>
+                                                )}
 
                                                 {task.description && (
-                                                    <p
-                                                        className="mt-1 line-clamp-2 text-xs leading-5"
-                                                        style={{ color: "var(--text-muted)" }}
-                                                    >
+                                                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">
                                                         {task.description}
                                                     </p>
                                                 )}
                                             </td>
 
-                                            <td className="px-4 py-4">
+                                            <td className="max-w-[180px] px-4 py-4 text-[var(--text-muted)]">
                                                 {getProjectName(task.project)}
                                             </td>
 
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div
-                                                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                                                        style={{
-                                                            background: "var(--primary-soft, #e1f2ef)",
-                                                            color: "var(--primary)",
-                                                        }}
-                                                    >
-                                                        {getPersonName(task.assignedTo)
-                                                            .charAt(0)
-                                                            .toUpperCase()}
-                                                    </div>
-
-                                                    <span>
-                                                        {getPersonName(task.assignedTo)}
-                                                    </span>
-                                                </div>
+                                            <td
+                                                className={`max-w-[180px] px-4 py-4 ${task.assignedTo
+                                                        ? ""
+                                                        : "text-[var(--text-subtle)]"
+                                                    }`}
+                                            >
+                                                {getPersonName(task.assignedTo)}
                                             </td>
 
                                             {canViewAllTasks && (
-                                                <td className="px-4 py-4">
+                                                <td className="max-w-[180px] px-4 py-4 text-[var(--text-muted)]">
                                                     {getPersonName(task.createdBy)}
                                                 </td>
                                             )}
 
-                                            <td className="px-4 py-4">
-                                                <span
-                                                    className="font-medium"
-                                                    style={
-                                                        priorityStyles[priority] ||
-                                                        priorityStyles.medium
-                                                    }
-                                                >
-                                                    {formatPriority(priority)}
-                                                </span>
+                                            <td
+                                                className={`whitespace-nowrap px-4 py-4 ${priority === "high"
+                                                        ? "font-semibold text-[var(--danger)]"
+                                                        : "text-[var(--text-muted)]"
+                                                    }`}
+                                            >
+                                                {formatPriority(priority)}
                                             </td>
 
-                                            <td className="whitespace-nowrap px-4 py-4">
-                                                <div
-                                                    className="flex items-center gap-1.5"
-                                                    style={{
-                                                        color: overdue
-                                                            ? "#dc2626"
-                                                            : "var(--text-muted)",
-                                                    }}
-                                                >
-                                                    <CalendarDays size={14} />
-                                                    {formatDate(task.dueDate)}
-                                                </div>
+                                            <td
+                                                className={`whitespace-nowrap px-4 py-4 ${overdue
+                                                        ? "font-semibold text-[var(--danger)]"
+                                                        : "text-[var(--text-muted)]"
+                                                    }`}
+                                            >
+                                                {formatDate(task.dueDate)}
 
                                                 {overdue && (
-                                                    <span className="mt-1 block text-xs font-medium text-red-600">
+                                                    <span className="mt-0.5 block text-xs font-medium">
                                                         Overdue
                                                     </span>
                                                 )}
                                             </td>
 
                                             <td className="px-4 py-4">
-                                                <span
-                                                    className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium"
-                                                    style={
-                                                        statusStyles[status] ||
-                                                        statusStyles.todo
-                                                    }
-                                                >
-                                                    {statusLabels[status] || status}
+                                                <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className="h-2 w-2 rounded-full"
+                                                        style={{
+                                                            background: status.color,
+                                                        }}
+                                                    />
+
+                                                    {status.label}
                                                 </span>
                                             </td>
 
                                             <td className="px-4 py-4">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    <span
-                                                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-                                                        style={{
-                                                            background: "var(--surface-muted)",
-                                                            color: "var(--text-muted)",
-                                                        }}
-                                                    >
-                                                        <Paperclip size={12} />
-                                                        {attachments.length}
+                                                {labels.length === 0 &&
+                                                    attachments.length === 0 ? (
+                                                    <span className="text-[var(--text-subtle)]">
+                                                        —
                                                     </span>
+                                                ) : (
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        {labels
+                                                            .slice(0, 2)
+                                                            .map((label, index) => (
+                                                                <span
+                                                                    key={
+                                                                        getId(label) ||
+                                                                        index
+                                                                    }
+                                                                    className="rounded-md bg-[var(--surface-muted)] px-2 py-1 text-xs text-[var(--text-muted)]"
+                                                                >
+                                                                    {typeof label ===
+                                                                        "object"
+                                                                        ? label.name ||
+                                                                        label.title ||
+                                                                        "Label"
+                                                                        : "Label"}
+                                                                </span>
+                                                            ))}
 
-                                                    {labels.length > 0 ? (
-                                                        labels.slice(0, 2).map((label, index) => (
-                                                            <span
-                                                                key={getId(label) || index}
-                                                                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-                                                                style={{
-                                                                    background: "var(--surface-muted)",
-                                                                    color: "var(--text-muted)",
-                                                                }}
-                                                            >
-                                                                <Tag size={11} />
-                                                                {typeof label === "object"
-                                                                    ? label.name || label.title || "Label"
-                                                                    : "Label"}
+                                                        {labels.length > 2 && (
+                                                            <span className="text-xs text-[var(--text-muted)]">
+                                                                +{labels.length - 2}
                                                             </span>
-                                                        ))
-                                                    ) : (
-                                                        <span
-                                                            className="text-xs"
-                                                            style={{ color: "var(--text-muted)" }}
-                                                        >
-                                                            No labels
-                                                        </span>
-                                                    )}
+                                                        )}
 
-                                                    {labels.length > 2 && (
-                                                        <span className="text-xs text-slate-500">
-                                                            +{labels.length - 2}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                        {attachments.length > 0 && (
+                                                            <span
+                                                                className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]"
+                                                                title={`${attachments.length} attachment${attachments.length ===
+                                                                        1
+                                                                        ? ""
+                                                                        : "s"
+                                                                    }`}
+                                                            >
+                                                                <Paperclip
+                                                                    size={12}
+                                                                    aria-hidden="true"
+                                                                />
+                                                                {attachments.length}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -1036,30 +994,23 @@ export default function Tasks() {
                             ) : (
                                 <tr>
                                     <td
-                                        colSpan={canViewAllTasks ? 8 : 7}
-                                        className="px-5 py-14 text-center"
+                                        colSpan={columnCount}
+                                        className="px-4 py-16 text-center"
                                     >
-                                        <ClipboardList
-                                            size={28}
-                                            className="mx-auto"
-                                            style={{ color: "var(--text-muted)" }}
-                                        />
-
-                                        <p className="mt-3 text-sm font-medium">
+                                        <p className="text-sm font-semibold text-[var(--text)]">
                                             {tasks.length === 0
                                                 ? canViewAllTasks
-                                                    ? "No tasks in this workspace yet."
-                                                    : "No tasks are assigned to you."
-                                                : "No tasks match your filters."}
+                                                    ? "No tasks in this workspace yet"
+                                                    : "No tasks are assigned to you"
+                                                : "No tasks match your filters"}
                                         </p>
 
-                                        <p
-                                            className="mt-1 text-sm"
-                                            style={{ color: "var(--text-muted)" }}
-                                        >
-                                            {canViewAllTasks
-                                                ? "Create a task or change your filters to see more results."
-                                                : "Ask your workspace owner to assign a task to you."}
+                                        <p className="mx-auto mt-1 max-w-sm text-sm leading-5 text-[var(--text-muted)]">
+                                            {tasks.length > 0
+                                                ? "Try a different search or clear a filter."
+                                                : canViewAllTasks
+                                                    ? "Create a task to get started."
+                                                    : "Ask your workspace owner to assign a task to you."}
                                         </p>
                                     </td>
                                 </tr>
@@ -1071,32 +1022,36 @@ export default function Tasks() {
 
             {/* Create task dialog */}
             {createOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/45 px-4 py-5 backdrop-blur-[2px] sm:py-8"
+                    onMouseDown={(event) => {
+                        if (
+                            event.target === event.currentTarget &&
+                            !creatingTask
+                        ) {
+                            setCreateOpen(false);
+                        }
+                    }}
+                >
                     <section
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="create-task-title"
-                        className="my-auto w-full max-w-lg rounded-2xl border p-6"
-                        style={{
-                            background: "var(--surface)",
-                            color: "var(--text)",
-                            borderColor: "var(--border)",
-                        }}
+                        className="my-auto max-h-[calc(100dvh-2.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 text-[var(--text)] sm:p-7"
                     >
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <h2
                                     id="create-task-title"
-                                    className="text-xl font-semibold"
+                                    className="text-2xl font-bold tracking-tight"
+                                    style={displayFont}
                                 >
                                     Create task
                                 </h2>
 
-                                <p
-                                    className="mt-1 text-sm"
-                                    style={{ color: "var(--text-muted)" }}
-                                >
-                                    Add a task to {currentWorkspace?.name || "this workspace"}.
+                                <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+                                    Add a task to{" "}
+                                    {currentWorkspace?.name || "this workspace"}.
                                 </p>
                             </div>
 
@@ -1105,25 +1060,19 @@ export default function Tasks() {
                                 onClick={() => setCreateOpen(false)}
                                 disabled={creatingTask}
                                 aria-label="Close dialog"
-                                className="flex size-8 items-center justify-center rounded-lg"
-                                style={{ color: "var(--text-muted)" }}
+                                className="-mr-1 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-xl text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
                         {createError && (
-                            <div
+                            <p
                                 role="alert"
-                                className="mt-5 rounded-lg border px-3 py-2.5 text-sm"
-                                style={{
-                                    borderColor: "#dc7777",
-                                    background: "var(--surface)",
-                                    color: "#c24141",
-                                }}
+                                className="mt-5 rounded-xl border border-[var(--danger)]/15 bg-[var(--danger-soft)] px-4 py-3 text-sm leading-5 text-[var(--danger)]"
                             >
                                 {createError}
-                            </div>
+                            </p>
                         )}
 
                         <form
@@ -1131,9 +1080,13 @@ export default function Tasks() {
                             className="mt-6 space-y-4"
                         >
                             <div>
-                                <label htmlFor="task-title" className="text-sm font-medium">
-                                    Task title
+                                <label
+                                    htmlFor="task-title"
+                                    className="block text-sm font-semibold text-[var(--text)]"
+                                >
+                                    Title
                                 </label>
+
                                 <input
                                     id="task-title"
                                     name="title"
@@ -1141,20 +1094,20 @@ export default function Tasks() {
                                     onChange={updateTaskForm}
                                     maxLength={200}
                                     required
+                                    autoFocus
                                     placeholder="Implement user authentication"
-                                    className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
-                                    style={{
-                                        background: "var(--surface)",
-                                        color: "var(--text)",
-                                        borderColor: "var(--border)",
-                                    }}
+                                    className={dialogField}
                                 />
                             </div>
 
                             <div>
-                                <label htmlFor="task-description" className="text-sm font-medium">
+                                <label
+                                    htmlFor="task-description"
+                                    className="block text-sm font-semibold text-[var(--text)]"
+                                >
                                     Description
                                 </label>
+
                                 <textarea
                                     id="task-description"
                                     name="description"
@@ -1162,41 +1115,41 @@ export default function Tasks() {
                                     onChange={updateTaskForm}
                                     rows={3}
                                     maxLength={3000}
-                                    placeholder="Describe the task..."
-                                    className="mt-2 w-full resize-y rounded-lg border px-3.5 py-3 text-sm outline-none"
-                                    style={{
-                                        background: "var(--surface)",
-                                        color: "var(--text)",
-                                        borderColor: "var(--border)",
-                                    }}
+                                    placeholder="What needs to be done?"
+                                    className={`${fieldBase} mt-1.5 resize-y py-3`}
                                 />
                             </div>
 
                             <div>
-                                <label htmlFor="task-project" className="text-sm font-medium">
+                                <label
+                                    htmlFor="task-project"
+                                    className="block text-sm font-semibold text-[var(--text)]"
+                                >
                                     Project
                                 </label>
+
                                 <select
                                     id="task-project"
                                     name="project"
                                     value={taskForm.project}
                                     onChange={updateTaskForm}
-                                    disabled={loadingProjects || projects.length === 0}
+                                    disabled={
+                                        loadingProjects || projects.length === 0
+                                    }
                                     required
-                                    className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
-                                    style={{
-                                        background: "var(--surface)",
-                                        color: "var(--text)",
-                                        borderColor: "var(--border)",
-                                    }}
+                                    className={dialogField}
                                 >
                                     <option value="">
                                         {loadingProjects
                                             ? "Loading projects..."
                                             : "Select a project"}
                                     </option>
+
                                     {projects.map((project) => (
-                                        <option key={getId(project)} value={getId(project)}>
+                                        <option
+                                            key={getId(project)}
+                                            value={getId(project)}
+                                        >
                                             {getProjectName(project)}
                                         </option>
                                     ))}
@@ -1204,46 +1157,48 @@ export default function Tasks() {
                             </div>
 
                             <div>
-                                <label htmlFor="task-assignee" className="text-sm font-medium">
+                                <label
+                                    htmlFor="task-assignee"
+                                    className="block text-sm font-semibold text-[var(--text)]"
+                                >
                                     Assign to
                                 </label>
+
                                 <select
                                     id="task-assignee"
                                     name="assignedTo"
                                     value={taskForm.assignedTo}
                                     onChange={updateTaskForm}
-                                    className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
-                                    style={{
-                                        background: "var(--surface)",
-                                        color: "var(--text)",
-                                        borderColor: "var(--border)",
-                                    }}
+                                    className={dialogField}
                                 >
                                     <option value="">Unassigned</option>
+
                                     {workspaceMembers.map((member) => (
-                                        <option key={member._id} value={member._id}>
+                                        <option
+                                            key={member._id}
+                                            value={member._id}
+                                        >
                                             {member.name}
                                         </option>
                                     ))}
                                 </select>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                                 <div>
-                                    <label htmlFor="task-priority" className="text-sm font-medium">
+                                    <label
+                                        htmlFor="task-priority"
+                                        className="block text-sm font-semibold text-[var(--text)]"
+                                    >
                                         Priority
                                     </label>
+
                                     <select
                                         id="task-priority"
                                         name="priority"
                                         value={taskForm.priority}
                                         onChange={updateTaskForm}
-                                        className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
-                                        style={{
-                                            background: "var(--surface)",
-                                            color: "var(--text)",
-                                            borderColor: "var(--border)",
-                                        }}
+                                        className={dialogField}
                                     >
                                         <option value="low">Low</option>
                                         <option value="medium">Medium</option>
@@ -1252,32 +1207,30 @@ export default function Tasks() {
                                 </div>
 
                                 <div>
-                                    <label htmlFor="task-due-date" className="text-sm font-medium">
+                                    <label
+                                        htmlFor="task-due-date"
+                                        className="block text-sm font-semibold text-[var(--text)]"
+                                    >
                                         Due date
                                     </label>
+
                                     <input
                                         id="task-due-date"
                                         name="dueDate"
                                         type="date"
                                         value={taskForm.dueDate}
                                         onChange={updateTaskForm}
-                                        className="mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none"
-                                        style={{
-                                            background: "var(--surface)",
-                                            color: "var(--text)",
-                                            borderColor: "var(--border)",
-                                        }}
+                                        className={dialogField}
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-3">
+                            <div className="flex flex-col-reverse gap-2.5 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-end">
                                 <button
                                     type="button"
                                     onClick={() => setCreateOpen(false)}
                                     disabled={creatingTask}
-                                    className="h-10 rounded-lg border px-4 text-sm font-medium"
-                                    style={{ borderColor: "var(--border)" }}
+                                    className={`inline-flex h-11 items-center justify-center rounded-xl border border-[var(--border)] px-5 text-sm font-semibold text-[var(--text)] transition-colors duration-150 hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
                                 >
                                     Cancel
                                 </button>
@@ -1290,11 +1243,19 @@ export default function Tasks() {
                                         !taskForm.title.trim() ||
                                         !taskForm.project
                                     }
-                                    className="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-50"
-                                    style={{ background: "var(--primary)" }}
+                                    className={`btn-primary inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
                                 >
-                                    <Plus size={16} />
-                                    {creatingTask ? "Creating..." : "Create task"}
+                                    {creatingTask ? (
+                                        <>
+                                            <Loader2
+                                                size={16}
+                                                className="animate-spin"
+                                            />
+                                            Creating...
+                                        </>
+                                    ) : (
+                                        "Create task"
+                                    )}
                                 </button>
                             </div>
                         </form>

@@ -8,8 +8,8 @@ import {
     useState,
 } from "react";
 
-import { useAuth } from "./AuthContext.jsx";
 import { getWorkspaces } from "../services/workspace.service.js";
+import { useAuth } from "../hooks/useAuth.js";
 
 const WorkspaceContext = createContext(null);
 
