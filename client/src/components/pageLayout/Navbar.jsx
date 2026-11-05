@@ -1,12 +1,17 @@
+
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { gsap } from "gsap";
 import {
   ArrowRight,
   Moon,
   Sun,
   ArrowUpRight,
+  LogOut,
+  LayoutDashboard,
 } from "lucide-react";
+
+import { useAuth } from "../../hooks/useAuth.js";
 
 const NAV_LINKS = [
   { label: "Home", to: "/" },
@@ -59,6 +64,17 @@ const Navbar = () => {
   const tlRef = useRef(null);
 
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const {
+    user,
+    isAuthenticated,
+    loading,
+    logout,
+  } = useAuth();
+
+  const isAdmin = user?.role === "admin";
+  const dashboardPath = isAdmin ? "/admin" : "/dashboard";
 
   /* Apply theme to <html> and persist it */
   useEffect(() => {
@@ -90,6 +106,7 @@ const Navbar = () => {
   /* Close the menu if the viewport grows to desktop size */
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
+
     const onChange = (event) => {
       if (event.matches) setMenuOpen(false);
     };
@@ -118,7 +135,7 @@ const Navbar = () => {
     };
   }, [menuOpen]);
 
-  /* Build one paused GSAP timeline: overlay + bars + rows, all in sync */
+  /* Build one paused GSAP timeline */
   useLayoutEffect(() => {
     const overlay = overlayRef.current;
 
@@ -133,28 +150,44 @@ const Navbar = () => {
 
       const tl = gsap.timeline({
         paused: true,
-        onReverseComplete: () => gsap.set(overlay, { visibility: "hidden" }),
+        onReverseComplete: () =>
+          gsap.set(overlay, { visibility: "hidden" }),
       });
 
       tl.to(
         overlay,
         { yPercent: 0, duration: 0.9, ease: "expo.inOut" },
-        0,
+        0
       )
         .to(
           topBarRef.current,
-          { y: 0, rotation: 45, duration: 0.55, ease: "power3.inOut" },
-          0,
+          {
+            y: 0,
+            rotation: 45,
+            duration: 0.55,
+            ease: "power3.inOut",
+          },
+          0
         )
         .to(
           midBarRef.current,
-          { scaleX: 0, opacity: 0, duration: 0.3, ease: "power2.in" },
-          0,
+          {
+            scaleX: 0,
+            opacity: 0,
+            duration: 0.3,
+            ease: "power2.in",
+          },
+          0
         )
         .to(
           botBarRef.current,
-          { y: 0, rotation: -45, duration: 0.55, ease: "power3.inOut" },
-          0,
+          {
+            y: 0,
+            rotation: -45,
+            duration: 0.55,
+            ease: "power3.inOut",
+          },
+          0
         )
         .fromTo(
           rows,
@@ -166,7 +199,7 @@ const Navbar = () => {
             stagger: 0.07,
             ease: "power4.out",
           },
-          0.3,
+          0.3
         );
 
       tlRef.current = tl;
@@ -178,7 +211,7 @@ const Navbar = () => {
     };
   }, []);
 
-  /* Drive the timeline from state — interruptible in both directions */
+  /* Drive the timeline from state */
   useEffect(() => {
     const tl = tlRef.current;
     const overlay = overlayRef.current;
@@ -186,7 +219,7 @@ const Navbar = () => {
     if (!tl || !overlay) return;
 
     const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
+      "(prefers-reduced-motion: reduce)"
     ).matches;
 
     if (menuOpen) {
@@ -210,9 +243,22 @@ const Navbar = () => {
   }, [menuOpen]);
 
   const toggleTheme = () =>
-    setTheme((current) => (current === "dark" ? "light" : "dark"));
+    setTheme((current) =>
+      current === "dark" ? "light" : "dark"
+    );
 
   const closeMenu = () => setMenuOpen(false);
+
+  const handleLogout = async () => {
+    closeMenu();
+
+    try {
+      await logout();
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   const barClass =
     "absolute left-0 top-1/2 -mt-px block h-0.5 w-5 rounded-full bg-current will-change-transform";
@@ -221,16 +267,18 @@ const Navbar = () => {
     <>
       <header
         className={`sticky top-0 z-50 h-16 w-full border-b backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-500 ${menuOpen
-          ? "border-transparent bg-transparent"
-          : "border-[var(--border)] bg-[var(--surface)]/85"
-          } ${scrolled && !menuOpen ? "shadow-[var(--shadow-sm)]" : ""}`}
+            ? "border-transparent bg-transparent"
+            : "border-[var(--border)] bg-[var(--surface)]/85"
+          } ${scrolled && !menuOpen
+            ? "shadow-[var(--shadow-sm)]"
+            : ""
+          }`}
       >
         <nav
           aria-label="Main navigation"
           className="mx-auto grid h-full max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-5 sm:px-8 md:grid-cols-[1fr_auto_1fr] lg:px-12"
         >
           {/* Logo */}
-
           <Link
             to="/"
             onClick={closeMenu}
@@ -250,8 +298,7 @@ const Navbar = () => {
             </span>
           </Link>
 
-
-          {/* Desktop links (centered) */}
+          {/* Desktop links */}
           <ul className="hidden items-center gap-1 md:flex">
             {NAV_LINKS.map((link) => (
               <li key={link.to}>
@@ -272,40 +319,73 @@ const Navbar = () => {
             <button
               type="button"
               onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"
+                } theme`}
               className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--surface-muted)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
             >
-              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+              {theme === "dark" ? (
+                <Sun size={17} />
+              ) : (
+                <Moon size={17} />
+              )}
             </button>
 
-            <Link
-              to="/login"
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-[var(--surface-muted)] md:inline-flex"
-              style={{ color: "var(--text)" }}
-            >
-              Log in
-            </Link>
+            {/* Authentication actions */}
+            {!loading && (
+              isAuthenticated ? (
+                <>
+                  <Link
+                    to={dashboardPath}
+                    className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-200 hover:bg-[var(--surface-muted)] md:inline-flex"
+                    style={{ color: "var(--text)" }}
+                  >
+                    <LayoutDashboard size={15} />
+                    {isAdmin ? "Admin Dashboard" : "Dashboard"}
+                  </Link>
 
-            <Link
-              to="/register"
-              className="group hidden items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-200 md:inline-flex"
-              style={primaryButtonStyle}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.backgroundColor =
-                  "var(--primary-hover)";
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.backgroundColor = "var(--primary)";
-              }}
-            >
-              Get started
-              <ArrowRight
-                size={14}
-                className="transition-transform duration-200 group-hover:translate-x-0.5"
-              />
-            </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="hidden items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--text-muted)] transition-colors duration-200 hover:border-[var(--danger)]/30 hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] md:inline-flex"
+                  >
+                    <LogOut size={15} />
+                    Log out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-[var(--surface-muted)] md:inline-flex"
+                    style={{ color: "var(--text)" }}
+                  >
+                    Log in
+                  </Link>
 
-            {/* Animated hamburger — mobile */}
+                  <Link
+                    to="/register"
+                    className="group hidden items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-200 md:inline-flex"
+                    style={primaryButtonStyle}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.backgroundColor =
+                        "var(--primary-hover)";
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.backgroundColor =
+                        "var(--primary)";
+                    }}
+                  >
+                    Get started
+                    <ArrowRight
+                      size={14}
+                      className="transition-transform duration-200 group-hover:translate-x-0.5"
+                    />
+                  </Link>
+                </>
+              )
+            )}
+
+            {/* Animated hamburger */}
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
@@ -313,21 +393,33 @@ const Navbar = () => {
               aria-expanded={menuOpen}
               aria-controls="mobile-menu"
               className={`relative flex h-10 w-10 items-center justify-center rounded-lg border transition-colors duration-500 md:hidden ${menuOpen
-                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary-text)]"
-                : "border-[var(--border)] bg-[var(--surface)] text-[var(--text)]"
+                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary-text)]"
+                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--text)]"
                 }`}
             >
-              <span aria-hidden="true" className="relative block h-5 w-5">
-                <span ref={topBarRef} className={barClass} />
-                <span ref={midBarRef} className={barClass} />
-                <span ref={botBarRef} className={barClass} />
+              <span
+                aria-hidden="true"
+                className="relative block h-5 w-5"
+              >
+                <span
+                  ref={topBarRef}
+                  className={barClass}
+                />
+                <span
+                  ref={midBarRef}
+                  className={barClass}
+                />
+                <span
+                  ref={botBarRef}
+                  className={barClass}
+                />
               </span>
             </button>
           </div>
         </nav>
       </header>
 
-      {/* True full-screen mobile menu */}
+      {/* Full-screen mobile menu */}
       <div
         ref={overlayRef}
         id="mobile-menu"
@@ -366,6 +458,7 @@ const Navbar = () => {
                   </span>
                   {link.label}
                 </span>
+
                 <ArrowUpRight
                   size={24}
                   className="text-[var(--text-subtle)]"
@@ -375,33 +468,65 @@ const Navbar = () => {
           ))}
         </ul>
 
-        {/* Menu actions */}
-        <div data-menu-row className="mt-8 grid grid-cols-2 gap-3">
-          <Link
-            to="/login"
-            onClick={closeMenu}
-            className="inline-flex min-h-12 items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold"
-            style={{ color: "var(--text)" }}
+        {/* Authentication actions */}
+        {!loading && (
+          <div
+            data-menu-row
+            className="mt-8 grid grid-cols-2 gap-3"
           >
-            Log in
-          </Link>
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to={dashboardPath}
+                  onClick={closeMenu}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold"
+                  style={{ color: "var(--text)" }}
+                >
+                  <LayoutDashboard size={16} />
+                  Dashboard
+                </Link>
 
-          <Link
-            to="/register"
-            onClick={closeMenu}
-            className="inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-sm font-semibold"
-            style={primaryButtonStyle}
-          >
-            Get started
-          </Link>
-        </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-4 text-sm font-semibold text-[var(--danger)] transition-colors hover:bg-[var(--danger-soft)]"
+                >
+                  <LogOut size={16} />
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  onClick={closeMenu}
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold"
+                  style={{ color: "var(--text)" }}
+                >
+                  Log in
+                </Link>
+
+                <Link
+                  to="/register"
+                  onClick={closeMenu}
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg px-4 text-sm font-semibold"
+                  style={primaryButtonStyle}
+                >
+                  Get started
+                </Link>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Menu footer */}
         <div
           data-menu-row
           className="mt-auto flex items-center justify-between gap-4 pt-10 text-xs text-[var(--text-subtle)]"
         >
-          <span>© TaskFlow {new Date().getFullYear()}. All rights reserved.</span>
+          <span>
+            © TaskFlow {new Date().getFullYear()}. All rights reserved.
+          </span>
 
           <a
             href={GITHUB_URL}

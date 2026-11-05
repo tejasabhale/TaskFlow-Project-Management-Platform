@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import Lenis from "lenis";
 import { gsap } from "gsap";
@@ -8,6 +9,9 @@ gsap.registerPlugin(ScrollTrigger);
 
 export default function SmoothScroll() {
   useEffect(() => {
+    const previousScrollRestoration =
+      window.history.scrollRestoration;
+
     if ("scrollRestoration" in window.history) {
       window.history.scrollRestoration = "manual";
     }
@@ -16,7 +20,15 @@ export default function SmoothScroll() {
       lerp: 0.08,
       smoothWheel: true,
       anchors: true,
-      allowNestedScroll: true,
+
+      // Handle marked modal and nested scroll areas natively.
+      allowNestedScroll: false,
+
+      prevent: (node) => {
+        return Boolean(
+          node?.closest?.("[data-lenis-prevent]")
+        );
+      },
     });
 
     window.lenis = lenis;
@@ -43,6 +55,11 @@ export default function SmoothScroll() {
       }
 
       lenis.destroy();
+
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration =
+          previousScrollRestoration;
+      }
     };
   }, []);
 

@@ -1,4 +1,3 @@
-
 import {
     useCallback,
     useEffect,
@@ -11,6 +10,7 @@ import { Link } from "react-router-dom";
 import { gsap } from "gsap";
 import {
     AlertCircle,
+    Check,
     ChevronDown,
     Loader2,
     Paperclip,
@@ -45,6 +45,20 @@ const STATUSES = [
 ];
 
 const STATUS_BY_KEY = Object.fromEntries(STATUSES.map((s) => [s.key, s]));
+
+const STATUS_FILTER_OPTIONS = [
+    { value: "All", label: "All statuses" },
+    ...STATUSES.map((status) => ({
+        value: status.key,
+        label: status.label,
+    })),
+];
+
+const PRIORITY_OPTIONS = [
+    { value: "low", label: "Low" },
+    { value: "medium", label: "Medium" },
+    { value: "high", label: "High" },
+];
 
 const initialTaskForm = {
     title: "",
@@ -151,24 +165,205 @@ function formatPriority(priority = "medium") {
 }
 
 /* ---------------------------------------------------------------
-   Consistent select control
+   Themed dropdown (replaces the native select and its option list)
 ---------------------------------------------------------------- */
 
-function FilterSelect({ className = "", children, ...props }) {
-    return (
-        <div className={`relative min-w-0 ${className}`}>
-            <select
-                {...props}
-                className={`${field} appearance-none pr-10`}
-            >
-                {children}
-            </select>
+function Dropdown({
+    id,
+    value,
+    options,
+    onChange,
+    ariaLabel,
+    placeholder = "Select",
+    disabled = false,
+    className = "",
+    buttonClassName = field,
+}) {
+    const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const [dropUp, setDropUp] = useState(false);
 
-            <ChevronDown
-                size={15}
-                aria-hidden="true"
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-            />
+    const rootRef = useRef(null);
+    const menuRef = useRef(null);
+
+    const selectedIndex = options.findIndex(
+        (option) => String(option.value) === String(value)
+    );
+    const selected = options[selectedIndex];
+
+    /* Close on outside click */
+    useEffect(() => {
+        if (!open) return undefined;
+
+        const onPointerDown = (event) => {
+            if (!rootRef.current?.contains(event.target)) {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", onPointerDown);
+
+        return () => document.removeEventListener("mousedown", onPointerDown);
+    }, [open]);
+
+    /* Keep the highlighted option visible while using the keyboard */
+    useEffect(() => {
+        if (!open || activeIndex < 0) return;
+
+        menuRef.current
+            ?.querySelector(`[data-index="${activeIndex}"]`)
+            ?.scrollIntoView({ block: "nearest" });
+    }, [open, activeIndex]);
+
+    const openMenu = () => {
+        if (disabled || options.length === 0) return;
+
+        const rect = rootRef.current?.getBoundingClientRect();
+
+        if (rect) {
+            const menuHeight = Math.min(options.length * 40 + 12, 256);
+            const spaceBelow = window.innerHeight - rect.bottom;
+
+            setDropUp(spaceBelow < menuHeight + 12 && rect.top > spaceBelow);
+        }
+
+        setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+        setOpen(true);
+    };
+
+    const choose = (option) => {
+        onChange(option.value);
+        setOpen(false);
+    };
+
+    const onKeyDown = (event) => {
+        if (event.key === "Escape") {
+            if (open) {
+                /* Close only the menu, not the dialog behind it */
+                event.stopPropagation();
+                setOpen(false);
+            }
+            return;
+        }
+
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+
+            if (!open) {
+                openMenu();
+                return;
+            }
+
+            const step = event.key === "ArrowDown" ? 1 : -1;
+
+            setActiveIndex(
+                (previous) =>
+                    (previous + step + options.length) % options.length
+            );
+            return;
+        }
+
+        if (event.key === "Home" && open) {
+            event.preventDefault();
+            setActiveIndex(0);
+            return;
+        }
+
+        if (event.key === "End" && open) {
+            event.preventDefault();
+            setActiveIndex(options.length - 1);
+            return;
+        }
+
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+
+            if (!open) {
+                openMenu();
+            } else if (options[activeIndex]) {
+                choose(options[activeIndex]);
+            }
+            return;
+        }
+
+        if (event.key === "Tab") setOpen(false);
+    };
+
+    return (
+        <div ref={rootRef} className={`relative min-w-0 ${className}`}>
+            <button
+                id={id}
+                type="button"
+                role="combobox"
+                aria-label={ariaLabel}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                disabled={disabled}
+                onClick={() => (open ? setOpen(false) : openMenu())}
+                onKeyDown={onKeyDown}
+                className={`${buttonClassName} flex items-center justify-between gap-2 text-left`}
+            >
+                <span
+                    className={`truncate ${selected ? "" : "text-[var(--text-subtle)]"
+                        }`}
+                >
+                    {selected?.label || placeholder}
+                </span>
+
+                <ChevronDown
+                    size={15}
+                    aria-hidden="true"
+                    className={`shrink-0 text-[var(--text-muted)] transition-transform duration-150 ${open ? "rotate-180" : ""
+                        }`}
+                />
+            </button>
+
+            {open && (
+                <ul
+                    ref={menuRef}
+                    role="listbox"
+                    className={`absolute left-0 z-30 max-h-60 w-full min-w-[180px] overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg ${dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
+                        }`}
+                >
+                    {options.map((option, index) => {
+                        const isSelected =
+                            String(option.value) === String(value);
+                        const isActive = index === activeIndex;
+
+                        return (
+                            <li
+                                key={`${option.value}-${index}`}
+                                data-index={index}
+                                role="option"
+                                aria-selected={isSelected}
+                                onMouseEnter={() => setActiveIndex(index)}
+                                onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    choose(option);
+                                }}
+                                className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-100 ${isSelected
+                                        ? "bg-[var(--primary-soft)] font-semibold text-[var(--primary)]"
+                                        : isActive
+                                            ? "bg-[var(--surface-muted)] font-medium text-[var(--text)]"
+                                            : "font-medium text-[var(--text)]"
+                                    }`}
+                            >
+                                <span className="truncate">
+                                    {option.label}
+                                </span>
+
+                                {isSelected && (
+                                    <Check
+                                        size={15}
+                                        aria-hidden="true"
+                                        className="shrink-0"
+                                    />
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
         </div>
     );
 }
@@ -381,6 +576,39 @@ export default function Tasks() {
         );
     }, [tasks]);
 
+    /* Dropdown option lists */
+    const assigneeFilterOptions = useMemo(
+        () => [
+            { value: "All", label: "All assignees" },
+            { value: "Unassigned", label: "Unassigned" },
+            ...assignees.map((person) => ({
+                value: person.id,
+                label: person.name,
+            })),
+        ],
+        [assignees]
+    );
+
+    const projectOptions = useMemo(
+        () =>
+            projects.map((project) => ({
+                value: getId(project),
+                label: getProjectName(project),
+            })),
+        [projects]
+    );
+
+    const memberOptions = useMemo(
+        () => [
+            { value: "", label: "Unassigned" },
+            ...workspaceMembers.map((member) => ({
+                value: member._id,
+                label: member.name,
+            })),
+        ],
+        [workspaceMembers]
+    );
+
     /* Task filtering */
     const filteredTasks = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -434,6 +662,12 @@ export default function Tasks() {
             [name]: value,
         }));
     };
+
+    const setFormValue = (name) => (value) =>
+        setTaskForm((current) => ({
+            ...current,
+            [name]: value,
+        }));
 
     /* Load projects for create-task dialog */
     const loadProjects = async () => {
@@ -670,8 +904,8 @@ export default function Tasks() {
 
                         <p
                             className={`mt-3 text-3xl font-bold tabular-nums tracking-tight ${stat.alert
-                                    ? "text-[var(--danger)]"
-                                    : "text-[var(--text)]"
+                                ? "text-[var(--danger)]"
+                                : "text-[var(--text)]"
                                 }`}
                             style={displayFont}
                         >
@@ -719,8 +953,8 @@ export default function Tasks() {
 
                     <div
                         className={`grid grid-cols-1 gap-2.5 ${canViewAllTasks
-                                ? "lg:grid-cols-[minmax(240px,1fr)_190px_210px]"
-                                : "sm:grid-cols-[minmax(240px,1fr)_190px]"
+                            ? "lg:grid-cols-[minmax(240px,1fr)_190px_210px]"
+                            : "sm:grid-cols-[minmax(240px,1fr)_190px]"
                             }`}
                     >
                         <div className="relative min-w-0 flex-1">
@@ -740,39 +974,20 @@ export default function Tasks() {
                             />
                         </div>
 
-                        <FilterSelect
-                            aria-label="Filter tasks by status"
+                        <Dropdown
+                            ariaLabel="Filter tasks by status"
                             value={statusFilter}
-                            onChange={(event) =>
-                                setStatusFilter(event.target.value)
-                            }
-                        >
-                            <option value="All">All statuses</option>
-
-                            {STATUSES.map((status) => (
-                                <option key={status.key} value={status.key}>
-                                    {status.label}
-                                </option>
-                            ))}
-                        </FilterSelect>
+                            options={STATUS_FILTER_OPTIONS}
+                            onChange={setStatusFilter}
+                        />
 
                         {canViewAllTasks && (
-                            <FilterSelect
-                                aria-label="Filter tasks by assignee"
+                            <Dropdown
+                                ariaLabel="Filter tasks by assignee"
                                 value={assigneeFilter}
-                                onChange={(event) =>
-                                    setAssigneeFilter(event.target.value)
-                                }
-                            >
-                                <option value="All">All assignees</option>
-                                <option value="Unassigned">Unassigned</option>
-
-                                {assignees.map((person) => (
-                                    <option key={person.id} value={person.id}>
-                                        {person.name}
-                                    </option>
-                                ))}
-                            </FilterSelect>
+                                options={assigneeFilterOptions}
+                                onChange={setAssigneeFilter}
+                            />
                         )}
                     </div>
                 </div>
@@ -885,8 +1100,8 @@ export default function Tasks() {
 
                                             <td
                                                 className={`max-w-[180px] px-4 py-4 ${task.assignedTo
-                                                        ? ""
-                                                        : "text-[var(--text-subtle)]"
+                                                    ? ""
+                                                    : "text-[var(--text-subtle)]"
                                                     }`}
                                             >
                                                 {getPersonName(task.assignedTo)}
@@ -900,8 +1115,8 @@ export default function Tasks() {
 
                                             <td
                                                 className={`whitespace-nowrap px-4 py-4 ${priority === "high"
-                                                        ? "font-semibold text-[var(--danger)]"
-                                                        : "text-[var(--text-muted)]"
+                                                    ? "font-semibold text-[var(--danger)]"
+                                                    : "text-[var(--text-muted)]"
                                                     }`}
                                             >
                                                 {formatPriority(priority)}
@@ -909,8 +1124,8 @@ export default function Tasks() {
 
                                             <td
                                                 className={`whitespace-nowrap px-4 py-4 ${overdue
-                                                        ? "font-semibold text-[var(--danger)]"
-                                                        : "text-[var(--text-muted)]"
+                                                    ? "font-semibold text-[var(--danger)]"
+                                                    : "text-[var(--text-muted)]"
                                                     }`}
                                             >
                                                 {formatDate(task.dueDate)}
@@ -973,9 +1188,9 @@ export default function Tasks() {
                                                             <span
                                                                 className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]"
                                                                 title={`${attachments.length} attachment${attachments.length ===
-                                                                        1
-                                                                        ? ""
-                                                                        : "s"
+                                                                    1
+                                                                    ? ""
+                                                                    : "s"
                                                                     }`}
                                                             >
                                                                 <Paperclip
@@ -1128,32 +1343,21 @@ export default function Tasks() {
                                     Project
                                 </label>
 
-                                <select
+                                <Dropdown
                                     id="task-project"
-                                    name="project"
+                                    className="mt-1.5"
                                     value={taskForm.project}
-                                    onChange={updateTaskForm}
+                                    options={projectOptions}
+                                    onChange={setFormValue("project")}
                                     disabled={
                                         loadingProjects || projects.length === 0
                                     }
-                                    required
-                                    className={dialogField}
-                                >
-                                    <option value="">
-                                        {loadingProjects
+                                    placeholder={
+                                        loadingProjects
                                             ? "Loading projects..."
-                                            : "Select a project"}
-                                    </option>
-
-                                    {projects.map((project) => (
-                                        <option
-                                            key={getId(project)}
-                                            value={getId(project)}
-                                        >
-                                            {getProjectName(project)}
-                                        </option>
-                                    ))}
-                                </select>
+                                            : "Select a project"
+                                    }
+                                />
                             </div>
 
                             <div>
@@ -1164,24 +1368,13 @@ export default function Tasks() {
                                     Assign to
                                 </label>
 
-                                <select
+                                <Dropdown
                                     id="task-assignee"
-                                    name="assignedTo"
+                                    className="mt-1.5"
                                     value={taskForm.assignedTo}
-                                    onChange={updateTaskForm}
-                                    className={dialogField}
-                                >
-                                    <option value="">Unassigned</option>
-
-                                    {workspaceMembers.map((member) => (
-                                        <option
-                                            key={member._id}
-                                            value={member._id}
-                                        >
-                                            {member.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    options={memberOptions}
+                                    onChange={setFormValue("assignedTo")}
+                                />
                             </div>
 
                             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -1193,17 +1386,13 @@ export default function Tasks() {
                                         Priority
                                     </label>
 
-                                    <select
+                                    <Dropdown
                                         id="task-priority"
-                                        name="priority"
+                                        className="mt-1.5"
                                         value={taskForm.priority}
-                                        onChange={updateTaskForm}
-                                        className={dialogField}
-                                    >
-                                        <option value="low">Low</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
+                                        options={PRIORITY_OPTIONS}
+                                        onChange={setFormValue("priority")}
+                                    />
                                 </div>
 
                                 <div>

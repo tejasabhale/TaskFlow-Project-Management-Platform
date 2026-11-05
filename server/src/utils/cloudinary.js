@@ -7,34 +7,44 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadOnCloudinary = async (localFilePath, resourceType = "image") => {
+const removeLocalFile = (filePath) => {
+  if (!filePath) return;
+
   try {
-    if (!localFilePath) return null;
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error("Unable to remove temporary file:", error.message);
+  }
+};
+
+const uploadOnCloudinary = async (
+  localFilePath,
+  resourceType = "image",
+  folder = "TaskFlow/attachments",
+) => {
+  if (!localFilePath) return null;
+
+  try {
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: resourceType,
-      folder: "TaskFlow/attachments",
+      folder,
     });
 
-    fs.unlinkSync(localFilePath);
     return response;
-  } catch (error) {
-    if (localFilePath && fs.existsSync(localFilePath)) {
-      fs.unlinkSync(localFilePath);
-    }
-    throw error;
+  } finally {
+    // Always remove the local temporary file.
+    removeLocalFile(localFilePath);
   }
 };
 
 const deleteFromCloudinary = async (publicId, resourceType = "image") => {
-  try {
-    if (!publicId) return;
+  if (!publicId) return null;
 
-    return await cloudinary.uploader.destroy(publicId, {
-      resource_type: resourceType,
-    });
-  } catch (error) {
-    throw error;
-  }
+  return cloudinary.uploader.destroy(publicId, {
+    resource_type: resourceType,
+  });
 };
 
 export { uploadOnCloudinary, deleteFromCloudinary };

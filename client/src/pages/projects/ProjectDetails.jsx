@@ -6,7 +6,9 @@ import {
     ArrowUpRight,
     AlertCircle,
     CalendarDays,
+    Check,
     CheckCircle2,
+    ChevronDown,
     Clock3,
     ClipboardList,
     FolderKanban,
@@ -37,7 +39,16 @@ const mutedLinkStyle = { color: "var(--text-muted)" };
 const textLinkStyle = { color: "var(--text)" };
 const primaryLinkStyle = { color: "var(--primary-text)" };
 
+/* Same page wrapper spacing as the Projects page, so both pages line up */
+const pageWrap =
+    "mx-auto w-full max-w-7xl min-w-0 space-y-6 px-4 py-6 text-[var(--text)] sm:space-y-7 sm:px-6 sm:py-8 lg:px-8 lg:py-9";
+
 const projectStatuses = ["Planning", "Active", "Completed", "Archived"];
+
+const statusOptions = projectStatuses.map((status) => ({
+    value: status,
+    label: status,
+}));
 
 const projectStatusBadge = {
     Planning: "bg-[var(--surface-muted)] text-[var(--text-muted)]",
@@ -63,16 +74,24 @@ const fieldBase =
     "w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3.5 text-base text-[var(--text)] " +
     "hover:border-[var(--border-strong)] placeholder:text-[var(--text-subtle)] " +
     "disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm";
-const field = `${fieldBase} mt-2 h-11`;
+const field = `${fieldBase} mt-2 h-10`;
 
 const panel = "rounded-xl border border-[var(--border)] bg-[var(--surface)]";
 
+/* Same padding everywhere inside a panel */
+const panelHeader = "border-b border-[var(--border)] px-5 py-5 sm:px-6";
+const panelBody = "px-5 py-5 sm:px-6";
+const panelPad = "p-5 sm:p-6";
+
 const btnBase =
-    "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold whitespace-nowrap " +
+    "inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold whitespace-nowrap sm:w-auto " +
     "disabled:cursor-not-allowed disabled:opacity-50";
 const btnSecondary = `${btnBase} border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)]`;
 const btnPrimary = `${btnBase} btn-primary active:scale-[0.98]`;
 const btnDanger = `${btnBase} border border-[var(--danger)] bg-[var(--surface)] text-[var(--danger)] hover:bg-[var(--danger-soft)]`;
+
+const alertBase =
+    "flex items-start gap-3 rounded-lg border px-4 py-3 text-sm leading-5";
 
 const initialForm = {
     name: "",
@@ -216,9 +235,208 @@ function projectToForm(project) {
 
 /* ---------- small components ---------- */
 
+/**
+ * "All projects" back link.
+ * Hover: the text shifts to the primary color, an underline draws in from the
+ * left, and the arrow nudges back. The color is driven by a CSS variable
+ * because index.css sets an unlayered color on <a>, which would otherwise
+ * override a normal hover:text-* class.
+ */
+function BackLink({ to = "/dashboard/projects", children = "All projects" }) {
+    return (
+        <Link
+            to={to}
+            style={{ color: "var(--back-link-color, var(--text-muted))" }}
+            className="group inline-flex items-center gap-2 rounded-sm text-sm font-medium transition-colors duration-200 outline-none hover:[--back-link-color:var(--primary-text)] focus-visible:[--back-link-color:var(--primary-text)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)] motion-reduce:transition-none"
+        >
+            <ArrowLeft
+                size={16}
+                aria-hidden="true"
+                className="transition-transform duration-200 group-hover:-translate-x-1 group-focus-visible:-translate-x-1 motion-reduce:transition-none"
+            />
+
+            <span className="bg-[linear-gradient(currentColor,currentColor)] bg-[length:0%_1.5px] bg-[position:left_100%] bg-no-repeat pb-0.5 transition-[background-size] duration-300 ease-out group-hover:bg-[length:100%_1.5px] group-focus-visible:bg-[length:100%_1.5px] motion-reduce:transition-none">
+                {children}
+            </span>
+        </Link>
+    );
+}
+
+/**
+ * Themed dropdown. Native <option> lists are drawn by the browser and ignore
+ * most CSS, so this renders the list with the same theme variables as the page.
+ */
+function ThemedSelect({ id, value, onChange, options, ariaLabel, disabled = false }) {
+    const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    const wrapperRef = useRef(null);
+    const listRef = useRef(null);
+
+    const selectedIndex = Math.max(
+        0,
+        options.findIndex((option) => option.value === value)
+    );
+    const selectedOption = options[selectedIndex];
+    const listId = `${id || "themed-select"}-listbox`;
+
+    const openMenu = () => {
+        if (disabled) return;
+        setActiveIndex(selectedIndex);
+        setOpen(true);
+    };
+
+    const closeMenu = () => setOpen(false);
+
+    const selectOption = (option) => {
+        onChange(option.value);
+        closeMenu();
+    };
+
+    useEffect(() => {
+        if (!open) return undefined;
+
+        const handlePointerDown = (event) => {
+            if (!wrapperRef.current?.contains(event.target)) {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handlePointerDown);
+        return () => document.removeEventListener("mousedown", handlePointerDown);
+    }, [open]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        listRef.current
+            ?.querySelector(`[data-index="${activeIndex}"]`)
+            ?.scrollIntoView({ block: "nearest" });
+    }, [open, activeIndex]);
+
+    const handleKeyDown = (event) => {
+        if (disabled) return;
+
+        switch (event.key) {
+            case "ArrowDown":
+                event.preventDefault();
+                if (!open) openMenu();
+                else setActiveIndex((index) => (index + 1) % options.length);
+                break;
+
+            case "ArrowUp":
+                event.preventDefault();
+                if (!open) openMenu();
+                else setActiveIndex((index) => (index - 1 + options.length) % options.length);
+                break;
+
+            case "Home":
+                if (open) {
+                    event.preventDefault();
+                    setActiveIndex(0);
+                }
+                break;
+
+            case "End":
+                if (open) {
+                    event.preventDefault();
+                    setActiveIndex(options.length - 1);
+                }
+                break;
+
+            case "Enter":
+            case " ":
+                event.preventDefault();
+                if (!open) openMenu();
+                else selectOption(options[activeIndex]);
+                break;
+
+            case "Escape":
+                if (open) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeMenu();
+                }
+                break;
+
+            case "Tab":
+                closeMenu();
+                break;
+
+            default:
+                break;
+        }
+    };
+
+    return (
+        <div ref={wrapperRef} className="relative mt-2 min-w-0">
+            <button
+                id={id}
+                type="button"
+                role="combobox"
+                aria-label={ariaLabel}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                aria-controls={listId}
+                disabled={disabled}
+                onClick={() => (open ? closeMenu() : openMenu())}
+                onKeyDown={handleKeyDown}
+                className="flex h-10 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-lg border bg-[var(--surface)] px-3.5 text-left text-base text-[var(--text)] outline-none transition-colors hover:border-[var(--border-strong)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+                style={{ borderColor: open ? "var(--primary)" : undefined }}
+            >
+                <span className="truncate">{selectedOption?.label}</span>
+
+                <ChevronDown
+                    size={16}
+                    aria-hidden="true"
+                    className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? "rotate-180" : ""
+                        }`}
+                />
+            </button>
+
+            {open && (
+                <ul
+                    ref={listRef}
+                    id={listId}
+                    role="listbox"
+                    aria-label={ariaLabel}
+                    className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-60 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 text-[var(--text)] shadow-lg"
+                >
+                    {options.map((option, index) => {
+                        const isSelected = option.value === value;
+                        const isActive = index === activeIndex;
+
+                        return (
+                            <li
+                                key={option.value}
+                                role="option"
+                                aria-selected={isSelected}
+                                data-index={index}
+                                onMouseEnter={() => setActiveIndex(index)}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => selectOption(option)}
+                                className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${isActive ? "bg-[var(--surface-muted)]" : ""
+                                    } ${isSelected
+                                        ? "font-semibold text-[var(--primary-text)]"
+                                        : ""
+                                    }`}
+                            >
+                                <span className="truncate">{option.label}</span>
+                                {isSelected && (
+                                    <Check size={15} aria-hidden="true" className="shrink-0" />
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 function Field({ label, htmlFor, children }) {
     return (
-        <div>
+        <div className="min-w-0">
             <label htmlFor={htmlFor} className="text-sm font-semibold">
                 {label}
             </label>
@@ -517,7 +735,7 @@ export default function ProjectDetails() {
 
     if (loading) {
         return (
-            <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-[var(--text-muted)]">
+            <div className="flex min-h-64 items-center justify-center gap-3 px-4 text-sm text-[var(--text-muted)]">
                 <Loader2 size={18} className="animate-spin text-[var(--primary)]" />
                 Loading project details...
             </div>
@@ -526,17 +744,10 @@ export default function ProjectDetails() {
 
     if (!project) {
         return (
-            <div className="mx-auto max-w-3xl space-y-5 px-1 py-2 text-[var(--text)] sm:px-2 sm:py-4">
-                <Link
-                    to="/dashboard/projects"
-                    style={mutedLinkStyle}
-                    className="inline-flex items-center gap-2 text-sm font-medium hover:underline"
-                >
-                    <ArrowLeft size={16} />
-                    All projects
-                </Link>
+            <div className={`${pageWrap} max-w-3xl`}>
+                <BackLink />
 
-                <section className={`${panel} p-6 sm:p-8`}>
+                <section className={`${panel} ${panelPad} sm:p-8`}>
                     <AlertCircle size={26} className="text-[var(--danger)]" />
 
                     <h1
@@ -553,7 +764,7 @@ export default function ProjectDetails() {
                     <button
                         type="button"
                         onClick={() => loadProject()}
-                        className={`${btnPrimary} mt-5`}
+                        className={`${btnPrimary} mt-5 sm:w-auto`}
                     >
                         Try again
                     </button>
@@ -587,22 +798,12 @@ export default function ProjectDetails() {
     ];
 
     return (
-        <div
-            ref={rootRef}
-            className="mx-auto max-w-7xl space-y-6 px-1 py-2 pb-8 text-[var(--text)] sm:space-y-8 sm:px-2 sm:py-4"
-        >
+        <div ref={rootRef} className={pageWrap}>
             {/* Heading */}
             <header className="space-y-4">
-                <Link
-                    to="/dashboard/projects"
-                    style={mutedLinkStyle}
-                    className="inline-flex items-center gap-2 text-sm font-medium hover:underline"
-                >
-                    <ArrowLeft size={16} />
-                    All projects
-                </Link>
+                <BackLink />
 
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                             <span
@@ -619,35 +820,25 @@ export default function ProjectDetails() {
                         </div>
 
                         <h1
-                            className="mt-3 break-words text-3xl font-bold tracking-tight sm:text-4xl"
+                            className="mt-3 break-words text-3xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-4xl"
                             style={displayFont}
                         >
                             {project.name}
                         </h1>
 
-                        <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                        <p className="mt-2 break-words text-sm leading-6 text-[var(--text-muted)]">
                             {workspaceName}
                         </p>
                     </div>
 
-                    {/* Actions: 2-col grid on phones, inline row from sm up */}
-                    <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
-                        <button
-                            type="button"
-                            onClick={() => loadProject(true)}
-                            disabled={refreshing || anyBusy}
-                            className={btnSecondary}
-                        >
-                            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
-                            Refresh
-                        </button>
-
+                    {/* Actions: Edit takes the full row first on phones, then Refresh + Delete share a row */}
+                    <div className="grid shrink-0 grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
                         {!editing && (
                             <button
                                 type="button"
                                 onClick={startEditing}
                                 disabled={anyBusy}
-                                className={btnPrimary}
+                                className={`${btnPrimary} col-span-2 sm:order-2 sm:col-span-1`}
                             >
                                 <Pencil size={15} />
                                 Edit project
@@ -656,9 +847,19 @@ export default function ProjectDetails() {
 
                         <button
                             type="button"
+                            onClick={() => loadProject(true)}
+                            disabled={refreshing || anyBusy}
+                            className={`${btnSecondary} sm:order-1`}
+                        >
+                            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+                            Refresh
+                        </button>
+
+                        <button
+                            type="button"
                             onClick={handleDelete}
                             disabled={anyBusy}
-                            className={btnDanger}
+                            className={`${btnDanger} sm:order-3`}
                         >
                             {deleting ? (
                                 <Loader2 size={15} className="animate-spin" />
@@ -675,17 +876,17 @@ export default function ProjectDetails() {
             {error && (
                 <div
                     role="alert"
-                    className="flex items-start gap-3 rounded-lg bg-[var(--danger-soft)] px-5 py-4 text-sm leading-5 text-[var(--danger)]"
+                    className={`${alertBase} border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)]`}
                 >
                     <AlertCircle size={17} className="mt-0.5 shrink-0" />
-                    <span className="flex-1">{error}</span>
+                    <span className="min-w-0 flex-1 break-words">{error}</span>
                 </div>
             )}
 
             {success && (
                 <p
                     role="status"
-                    className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-sm font-medium text-[var(--success)]"
+                    className={`${alertBase} items-center border-[var(--border)] bg-[var(--surface)] font-medium text-[var(--success)]`}
                 >
                     <CheckCircle2 size={17} className="shrink-0" />
                     {success}
@@ -698,16 +899,21 @@ export default function ProjectDetails() {
                 className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--border)] lg:grid-cols-4"
             >
                 {stats.map((stat) => (
-                    <div key={stat.label} className="bg-[var(--surface)] px-5 py-5 sm:px-6 sm:py-6">
+                    <div
+                        key={stat.label}
+                        className="flex min-w-0 flex-col bg-[var(--surface)] px-5 py-5 sm:px-6 sm:py-6"
+                    >
                         <p className="text-sm text-[var(--text-muted)]">{stat.label}</p>
+
                         <p
                             className="mt-2 text-3xl font-bold tabular-nums tracking-tight"
                             style={displayFont}
                         >
                             {loadingTasks ? "—" : stat.value}
                         </p>
+
                         {stat.bar && (
-                            <div className="mt-3">
+                            <div className="mt-auto pt-3">
                                 <ProgressBar
                                     value={loadingTasks ? 0 : progress}
                                     label="Project completion"
@@ -719,20 +925,20 @@ export default function ProjectDetails() {
             </section>
 
             {/* Main layout */}
-            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="min-w-0 space-y-6">
                     {/* Project details */}
-                    <section className={`${panel} overflow-hidden`}>
-                        <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
+                    <section className={panel}>
+                        <div className={panelHeader}>
                             <h2 className="font-semibold">Project details</h2>
                             <p className="mt-1 text-sm text-[var(--text-muted)]">
                                 Name, description, status and timeline.
                             </p>
                         </div>
 
-                        <div className="px-5 py-5 sm:px-6">
+                        <div className={panelBody}>
                             {!editing ? (
-                                <p className="max-w-prose whitespace-pre-wrap break-words text-sm leading-7 text-[var(--text-muted)]">
+                                <p className="max-w-prose whitespace-pre-wrap break-words text-sm leading-7 text-[var(--text-muted)] [overflow-wrap:anywhere]">
                                     {project.description || "No description has been provided."}
                                 </p>
                             ) : (
@@ -768,21 +974,16 @@ export default function ProjectDetails() {
                                         />
                                     </Field>
 
-                                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                                         <Field label="Status" htmlFor="project-status">
-                                            <select
+                                            <ThemedSelect
                                                 id="project-status"
-                                                name="status"
                                                 value={form.status}
-                                                onChange={updateForm}
-                                                className={field}
-                                            >
-                                                {projectStatuses.map((status) => (
-                                                    <option key={status} value={status}>
-                                                        {status}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                                onChange={(status) =>
+                                                    setForm((current) => ({ ...current, status }))
+                                                }
+                                                options={statusOptions}
+                                            />
                                         </Field>
 
                                         <Field label="Start date" htmlFor="project-start-date">
@@ -841,7 +1042,7 @@ export default function ProjectDetails() {
 
                     {/* Project tasks */}
                     <section className={`${panel} overflow-hidden`}>
-                        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-5 sm:px-6">
+                        <div className={`${panelHeader} flex items-center justify-between gap-3`}>
                             <div className="min-w-0">
                                 <h2 className="flex items-center gap-2 font-semibold">
                                     Project tasks
@@ -867,9 +1068,10 @@ export default function ProjectDetails() {
                         {taskError && (
                             <div
                                 role="alert"
-                                className="m-4 rounded-lg bg-[var(--danger-soft)] px-4 py-3 text-sm leading-5 text-[var(--danger)] sm:m-6"
+                                className={`${alertBase} m-5 border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)] sm:m-6`}
                             >
-                                {taskError}
+                                <AlertCircle size={17} className="mt-0.5 shrink-0" />
+                                <span className="min-w-0 flex-1 break-words">{taskError}</span>
                             </div>
                         )}
 
@@ -903,7 +1105,7 @@ export default function ProjectDetails() {
                                             <th className="px-5 py-3 font-semibold sm:px-6">Task</th>
                                             <th className="px-4 py-3 font-semibold">Priority</th>
                                             <th className="px-4 py-3 font-semibold">Due date</th>
-                                            <th className="px-4 py-3 font-semibold">Status</th>
+                                            <th className="px-4 py-3 font-semibold sm:pr-6">Status</th>
                                         </tr>
                                     </thead>
 
@@ -922,19 +1124,22 @@ export default function ProjectDetails() {
                                                         <Link
                                                             to={`/dashboard/tasks/${encodeURIComponent(task._id)}`}
                                                             style={textLinkStyle}
-                                                            className="font-semibold hover:underline"
+                                                            className="break-words font-semibold hover:underline [overflow-wrap:anywhere]"
                                                         >
                                                             {task.title || "Untitled task"}
                                                         </Link>
 
                                                         {task.assignedTo && (
-                                                            <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                                            <p className="mt-1 break-words text-xs text-[var(--text-muted)]">
                                                                 {getPersonName(task.assignedTo)}
                                                             </p>
                                                         )}
                                                     </td>
 
-                                                    <td className={`px-4 py-4 capitalize ${priorityText[priority] || priorityText.medium}`}>
+                                                    <td
+                                                        className={`px-4 py-4 capitalize ${priorityText[priority] || priorityText.medium
+                                                            }`}
+                                                    >
                                                         {priority}
                                                     </td>
 
@@ -942,11 +1147,11 @@ export default function ProjectDetails() {
                                                         {formatDate(task.dueDate)}
                                                     </td>
 
-                                                    <td className="px-4 py-4">
+                                                    <td className="px-4 py-4 sm:pr-6">
                                                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                                                             <span
                                                                 aria-hidden="true"
-                                                                className="h-2 w-2 rounded-full"
+                                                                className="size-2 rounded-full"
                                                                 style={{ background: status.color }}
                                                             />
                                                             {status.label}
@@ -963,8 +1168,8 @@ export default function ProjectDetails() {
                 </div>
 
                 {/* Sidebar */}
-                <aside className="space-y-6 lg:sticky lg:top-4">
-                    <section className={`${panel} p-5 sm:p-6`}>
+                <aside className="min-w-0 space-y-6 lg:sticky lg:top-4">
+                    <section className={`${panel} ${panelPad}`}>
                         <h2 className="font-semibold">Project information</h2>
 
                         <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">
@@ -1004,7 +1209,7 @@ export default function ProjectDetails() {
                         </div>
                     </section>
 
-                    <section className={`${panel} p-5 sm:p-6`}>
+                    <section className={`${panel} ${panelPad}`}>
                         <h2 className="font-semibold">Task completion</h2>
 
                         <p
@@ -1028,7 +1233,7 @@ export default function ProjectDetails() {
                         </p>
                     </section>
 
-                    <section className={`${panel} p-5 sm:p-6`}>
+                    <section className={`${panel} ${panelPad}`}>
                         <h2 className="font-semibold">Activity</h2>
 
                         <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">

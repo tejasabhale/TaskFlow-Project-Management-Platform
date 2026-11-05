@@ -34,9 +34,7 @@ const displayFont = {
         '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
 };
 
-/* index.css sets an unlayered color on <a>, so link colors are inline */
-const backLinkStyle = { color: "var(--text-muted)" };
-
+/* Colors come from the theme variables in index.css (light + .dark) */
 const statusOptions = [
     { label: "To do", value: "todo", color: "var(--text-subtle)" },
     { label: "In progress", value: "inProgress", color: "var(--primary)" },
@@ -351,6 +349,33 @@ function MetadataItem({ icon: Icon, label, children }) {
                 <div className="mt-0.5 break-words text-sm font-semibold">{children}</div>
             </div>
         </div>
+    );
+}
+
+/**
+ * "All tasks" back link (same effect as the Projects page).
+ * Hover: text shifts to the primary color, an underline draws in from the
+ * left, and the arrow nudges back. The color is driven by a CSS variable
+ * because index.css sets an unlayered color on <a>, which would otherwise
+ * override a normal hover:text-* class.
+ */
+function BackLink({ to = "/dashboard/tasks", children = "All tasks" }) {
+    return (
+        <Link
+            to={to}
+            style={{ color: "var(--back-link-color, var(--text))" }}
+            className="group inline-flex items-center gap-2 rounded-sm text-sm font-medium transition-colors duration-200 outline-none hover:[--back-link-color:var(--primary-text)] focus-visible:[--back-link-color:var(--primary-text)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)] motion-reduce:transition-none"
+        >
+            <ArrowLeft
+                size={16}
+                aria-hidden="true"
+                className="transition-transform duration-200 group-hover:-translate-x-1 group-focus-visible:-translate-x-1 motion-reduce:transition-none"
+            />
+
+            <span className="bg-[linear-gradient(currentColor,currentColor)] bg-[length:0%_1.5px] bg-[position:left_100%] bg-no-repeat pb-0.5 transition-[background-size] duration-300 ease-out group-hover:bg-[length:100%_1.5px] group-focus-visible:bg-[length:100%_1.5px] motion-reduce:transition-none">
+                {children}
+            </span>
+        </Link>
     );
 }
 
@@ -696,14 +721,7 @@ export default function TaskDetails() {
     if (!task) {
         return (
             <div className="mx-auto max-w-3xl space-y-5 px-1 py-2 text-[var(--text)] sm:px-2 sm:py-4">
-                <Link
-                    to="/dashboard/tasks"
-                    style={backLinkStyle}
-                    className="inline-flex items-center gap-2 text-sm font-medium hover:underline"
-                >
-                    <ArrowLeft size={16} />
-                    All tasks
-                </Link>
+                <BackLink />
 
                 <section className={`${panel} p-6 sm:p-8`}>
                     <AlertCircle size={26} className="text-[var(--danger)]" />
@@ -762,14 +780,7 @@ export default function TaskDetails() {
         >
             {/* Heading */}
             <header className="space-y-4">
-                <Link
-                    to="/dashboard/tasks"
-                    style={backLinkStyle}
-                    className="inline-flex items-center gap-2 text-sm font-medium hover:underline"
-                >
-                    <ArrowLeft size={16} />
-                    All tasks
-                </Link>
+                <BackLink />
 
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0">

@@ -7,13 +7,14 @@ import {
 } from "../controllers/profile.controller.js";
 
 import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { avatarUpload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 
 router.use(verifyJWT);
 
 router.get("/me", getMyProfile);
-router.patch("/me", updateMyProfile);
+router.patch("/me", avatarUpload.single("avatar"), updateMyProfile);
 router.get("/users/:userId", getUserProfileById);
 
 export default router;

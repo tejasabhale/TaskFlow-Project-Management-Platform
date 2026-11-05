@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -62,7 +63,7 @@ function getCreatedWorkspace(response) {
   return result;
 }
 
-/* ---------- Shared style tokens ---------- */
+/* ---------- Shared theme-aware styles ---------- */
 
 const focusRing =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]";
@@ -73,7 +74,8 @@ const iconButtonClass =
   "hover:bg-[var(--surface-muted)] hover:text-[var(--text)] " +
   focusRing;
 
-const sectionLabelClass = "text-xs font-semibold text-[var(--text-subtle)]";
+const sectionLabelClass =
+  "text-xs font-semibold tracking-wide text-[var(--text-subtle)]";
 
 const fieldClass =
   "mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm " +
@@ -86,7 +88,7 @@ function FormField({ label, id, hint, as: Component = "input", ...props }) {
 
   return (
     <div className="min-w-0">
-      <label htmlFor={id} className="text-sm font-medium text-[var(--text)]">
+      <label htmlFor={id} className="text-sm font-semibold text-[var(--text)]">
         {label}
       </label>
 
@@ -108,19 +110,31 @@ function FormField({ label, id, hint, as: Component = "input", ...props }) {
 
 /* ---------- Workspace dropdown ---------- */
 
-function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }) {
+function WorkspaceSelect({
+  workspaces,
+  selectedId,
+  loading,
+  onSelect,
+  onCreate,
+}) {
   const reduceMotion = useReducedMotion();
   const triggerRef = useRef(null);
   const listRef = useRef(null);
 
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 256 });
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 256,
+  });
 
   const disabled = loading || workspaces.length === 0;
+
   const selectedIndex = workspaces.findIndex(
     (workspace) => getId(workspace) === selectedId,
   );
+
   const selected = selectedIndex >= 0 ? workspaces[selectedIndex] : null;
 
   const triggerText = loading
@@ -138,7 +152,6 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
   const openMenu = () => {
     if (disabled || !triggerRef.current) return;
 
-    // Portaled to <body> so the sidebar's clipping can't cut it off.
     const rect = triggerRef.current.getBoundingClientRect();
 
     setPosition({
@@ -163,12 +176,10 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
     close();
   };
 
-  // Move focus into the list when it opens.
   useEffect(() => {
     if (open) listRef.current?.focus({ preventScroll: true });
   }, [open]);
 
-  // Keep the highlighted option visible while using the keyboard.
   useEffect(() => {
     if (!open) return;
 
@@ -177,7 +188,6 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
       ?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
 
-  // The menu is positioned once, so close it if the layout changes.
   useEffect(() => {
     if (!open) return undefined;
 
@@ -195,32 +205,38 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
         event.preventDefault();
         setActiveIndex((index) => Math.min(index + 1, lastIndex));
         break;
+
       case "ArrowUp":
         event.preventDefault();
         setActiveIndex((index) => Math.max(index - 1, 0));
         break;
+
       case "Home":
         event.preventDefault();
         setActiveIndex(0);
         break;
+
       case "End":
         event.preventDefault();
         setActiveIndex(lastIndex);
         break;
+
       case "Enter":
       case " ":
         event.preventDefault();
         choose(workspaces[activeIndex]);
         break;
+
       case "Escape":
-        // Don't let Escape also close the drawer.
         event.preventDefault();
         event.stopPropagation();
         close();
         break;
+
       case "Tab":
         close(false);
         break;
+
       default:
         break;
     }
@@ -251,16 +267,16 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
       >
         <span
           aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[11px] font-bold text-[var(--primary)]"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[11px] font-extrabold text-[var(--text)]"
         >
           {selected ? getInitials(selected.name) : "W"}
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-[var(--text)]">
+          <span className="block truncate text-sm font-bold text-[var(--text)]">
             {triggerText}
           </span>
-          <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">
+          <span className="mt-0.5 block truncate text-[11px] font-medium text-[var(--text-muted)]">
             {subtitle}
           </span>
         </span>
@@ -276,7 +292,6 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
         <AnimatePresence>
           {open && (
             <>
-              {/* Click-away layer */}
               <motion.div
                 key="workspace-backdrop"
                 className="fixed inset-0 z-[80]"
@@ -300,7 +315,7 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
                   left: position.left,
                   width: position.width,
                 }}
-                className="fixed z-[81] origin-top overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-1.5 text-[var(--text)] shadow-2xl"
+                className="fixed z-[81] origin-top overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-1.5 text-[var(--text)] shadow-[var(--shadow-md)]"
               >
                 <p className={`px-2.5 pb-1 pt-1.5 ${sectionLabelClass}`}>
                   Switch workspace
@@ -330,18 +345,15 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
                         onMouseEnter={() => setActiveIndex(index)}
                         onClick={() => choose(workspace)}
                         className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-1.5 text-sm transition-colors duration-150 ${isSelected
-                          ? "bg-[var(--primary-soft,var(--surface-muted))] font-semibold text-[var(--primary)]"
-                          : isActive
-                            ? "bg-[var(--surface-muted)] font-medium text-[var(--text)]"
-                            : "font-medium text-[var(--text-muted)]"
+                            ? "bg-[var(--primary-soft)] font-bold text-[var(--text)]"
+                            : isActive
+                              ? "bg-[var(--surface-muted)] font-semibold text-[var(--text)]"
+                              : "font-medium text-[var(--text-muted)]"
                           }`}
                       >
                         <span
                           aria-hidden="true"
-                          className={`flex size-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ${isSelected
-                            ? "bg-[var(--surface)] text-[var(--primary)]"
-                            : "bg-[var(--primary-soft)] text-[var(--primary)]"
-                            }`}
+                          className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[10px] font-extrabold text-[var(--text)]"
                         >
                           {getInitials(workspace.name)}
                         </span>
@@ -355,7 +367,7 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
                             size={16}
                             strokeWidth={2.2}
                             aria-hidden="true"
-                            className="shrink-0"
+                            className="shrink-0 text-[var(--primary)]"
                           />
                         )}
                       </li>
@@ -370,11 +382,11 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
                       close(false);
                       onCreate();
                     }}
-                    className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-sm font-medium text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-muted)] hover:text-[var(--text)] ${focusRing}`}
+                    className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-sm font-semibold text-[var(--text)] transition-colors duration-150 hover:bg-[var(--surface-muted)] ${focusRing}`}
                   >
                     <span
                       aria-hidden="true"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--border-strong,var(--border))]"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--border-strong)] text-[var(--text)]"
                     >
                       <Plus size={15} />
                     </span>
@@ -395,15 +407,19 @@ function WorkspaceSelect({ workspaces, selectedId, loading, onSelect, onCreate }
 
 function CreateWorkspaceDialog({ open, onClose }) {
   const reduceMotion = useReducedMotion();
-  const { workspaces, setCurrentWorkspace, refreshWorkspaces, clearWorkspaceError } =
-    useWorkspace();
+
+  const {
+    workspaces,
+    setCurrentWorkspace,
+    refreshWorkspaces,
+    clearWorkspaceError,
+  } = useWorkspace();
 
   const [form, setForm] = useState({ name: "", description: "" });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState("");
 
-  // Start with a clean form every time the dialog opens.
   useEffect(() => {
     if (!open) return;
 
@@ -411,7 +427,6 @@ function CreateWorkspaceDialog({ open, onClose }) {
     setForm({ name: "", description: "" });
   }, [open]);
 
-  // Select a newly created workspace when it appears in shared context.
   useEffect(() => {
     if (!createdWorkspaceId) return;
 
@@ -427,7 +442,6 @@ function CreateWorkspaceDialog({ open, onClose }) {
 
   const requestClose = () => {
     if (creating) return;
-
     onClose();
     setError("");
   };
@@ -455,8 +469,8 @@ function CreateWorkspaceDialog({ open, onClose }) {
       setCreating(true);
 
       const response = await createWorkspace({ name, description });
-
       const newWorkspace = getCreatedWorkspace(response);
+
       newWorkspaceId = getId(newWorkspace);
 
       if (!newWorkspaceId) {
@@ -480,8 +494,6 @@ function CreateWorkspaceDialog({ open, onClose }) {
       setCreating(false);
     }
 
-    // A refresh failure must not be reported as a creation failure.
-    // The shared-context effect will select the workspace when it appears.
     try {
       const refreshed = await refreshWorkspaces();
 
@@ -507,13 +519,12 @@ function CreateWorkspaceDialog({ open, onClose }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           data-lenis-prevent
-          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/45 px-4 py-5 backdrop-blur-[2px] sm:py-8"
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[var(--overlay)] px-4 py-5 sm:py-8"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) requestClose();
           }}
           onKeyDown={(event) => {
             if (event.key !== "Escape") return;
-
             event.preventDefault();
             event.stopPropagation();
             requestClose();
@@ -528,26 +539,28 @@ function CreateWorkspaceDialog({ open, onClose }) {
             }
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={
-              reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }
+              reduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: 12, scale: 0.98 }
             }
             transition={{ duration: 0.28, ease: EASE }}
-            className="my-auto max-h-[calc(100dvh-2.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 text-[var(--text)] shadow-2xl sm:p-7"
+            className="my-auto max-h-[calc(100dvh-2.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 text-[var(--text)] shadow-[var(--shadow-md)] sm:p-7"
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <span className="mb-4 flex size-10 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+                <span className="mb-4 flex size-10 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--text)]">
                   <FolderKanban size={20} />
                 </span>
 
                 <h2
                   id="create-workspace-title"
-                  className="font-['Plus_Jakarta_Sans',sans-serif] text-xl font-bold tracking-[-0.035em] sm:text-2xl"
+                  className="text-xl font-extrabold tracking-tight text-[var(--text)] sm:text-2xl"
                 >
                   Create workspace
                 </h2>
 
                 <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-                  Create a shared space to organize your team&apos;s work.
+                  Create a shared space to organize your team's work.
                 </p>
               </div>
 
@@ -573,7 +586,7 @@ function CreateWorkspaceDialog({ open, onClose }) {
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div className="mt-5 rounded-xl border border-[var(--danger,#dc2626)]/40 bg-[var(--surface-muted)] px-3.5 py-3 text-sm leading-6 text-[var(--danger,#dc2626)]">
+                  <div className="mt-5 rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-3.5 py-3 text-sm font-semibold leading-6 text-[var(--danger)]">
                     {error}
                   </div>
                 </motion.div>
@@ -591,7 +604,10 @@ function CreateWorkspaceDialog({ open, onClose }) {
                 maxLength={100}
                 value={form.name}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
                 hint="Use at least 3 characters."
                 required
@@ -628,7 +644,7 @@ function CreateWorkspaceDialog({ open, onClose }) {
                   type="button"
                   onClick={requestClose}
                   disabled={creating}
-                  className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--border)] px-5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
+                  className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
                 >
                   Cancel
                 </button>
@@ -636,7 +652,7 @@ function CreateWorkspaceDialog({ open, onClose }) {
                 <button
                   type="submit"
                   disabled={creating || form.name.trim().length < 3}
-                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--primary)] bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--primary)] bg-[var(--primary)] px-5 text-sm font-bold text-[var(--text-inverse)] transition-colors hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
                 >
                   <Plus size={16} />
                   {creating ? "Creating..." : "Create workspace"}
@@ -659,6 +675,7 @@ function SidebarPanel({ open, onClose, onCreate }) {
   const panelRef = useRef(null);
 
   const { user, logout } = useAuth();
+
   const {
     workspaces,
     currentWorkspaceId,
@@ -672,10 +689,10 @@ function SidebarPanel({ open, onClose, onCreate }) {
 
   const displayName =
     user?.fullName || user?.userName || user?.name || "My Account";
+
   const email = user?.email || "";
   const userInitials = getInitials(displayName);
 
-  // GSAP: stagger the content in each time the sidebar opens.
   useEffect(() => {
     if (!open || reduceMotion || !panelRef.current) return undefined;
 
@@ -731,7 +748,8 @@ function SidebarPanel({ open, onClose, onCreate }) {
             draggable="false"
             className="size-9 shrink-0 object-contain"
           />
-          <span className="truncate font-['Plus_Jakarta_Sans',sans-serif] text-lg font-bold tracking-[-0.04em] text-[var(--text)]">
+
+          <span className="truncate text-lg font-extrabold tracking-tight text-[var(--text)]">
             Task<span className="text-[var(--primary)]">Flow</span>
           </span>
         </NavLink>
@@ -783,7 +801,7 @@ function SidebarPanel({ open, onClose, onCreate }) {
         {workspaceError && (
           <p
             role="alert"
-            className="mt-2 break-words px-1 text-xs leading-5 text-[var(--danger,#dc2626)]"
+            className="mt-2 break-words px-1 text-xs font-semibold leading-5 text-[var(--danger)]"
           >
             {workspaceError}
           </p>
@@ -808,8 +826,8 @@ function SidebarPanel({ open, onClose, onCreate }) {
                 end={end}
                 className={({ isActive }) =>
                   `group relative flex h-11 items-center gap-3 rounded-xl px-3.5 text-sm transition-colors duration-200 ${focusRing} ${isActive
-                    ? "font-semibold text-[var(--primary)]"
-                    : "font-medium text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                    ? "font-bold text-[var(--primary)]"
+                    : "font-semibold text-[var(--text)] hover:bg-[var(--surface-muted)]"
                   }`
                 }
               >
@@ -825,8 +843,9 @@ function SidebarPanel({ open, onClose, onCreate }) {
                             stiffness: 420,
                             damping: 34,
                           }}
-                          className="absolute inset-0 rounded-xl bg-[var(--primary-soft,var(--surface-muted))]"
+                          className="absolute inset-0 rounded-xl bg-[var(--primary-soft)]"
                         />
+
                         <motion.span
                           layoutId="sidebar-active-bar"
                           aria-hidden="true"
@@ -843,8 +862,12 @@ function SidebarPanel({ open, onClose, onCreate }) {
                     <Icon
                       size={18}
                       strokeWidth={1.8}
-                      className="relative shrink-0 transition-transform duration-200 group-hover:scale-110"
+                      className={`relative shrink-0 transition-colors duration-200 ${isActive
+                          ? "text-[var(--primary)]"
+                          : "text-[var(--text)]"
+                        }`}
                     />
+
                     <span className="relative truncate">{name}</span>
                   </>
                 )}
@@ -858,22 +881,22 @@ function SidebarPanel({ open, onClose, onCreate }) {
       <div className="shrink-0 border-t border-[var(--border)] p-4">
         <div
           data-sb-item
-          className="flex min-w-0 items-center gap-3 rounded-2xl bg-[var(--surface-muted)] p-2.5"
+          className="flex min-w-0 items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-2.5"
         >
           <span
             title={displayName}
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)] ring-1 ring-inset ring-[var(--border)]"
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-xs font-extrabold text-[var(--text)] ring-1 ring-inset ring-[var(--border)]"
           >
             {userInitials}
           </span>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-[var(--text)]">
+            <p className="truncate text-sm font-bold text-[var(--text)]">
               {displayName}
             </p>
 
             {email && (
-              <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
+              <p className="mt-0.5 truncate text-xs font-medium text-[var(--text-muted)]">
                 {email}
               </p>
             )}
@@ -893,7 +916,7 @@ function SidebarPanel({ open, onClose, onCreate }) {
         {logoutError && (
           <p
             role="alert"
-            className="break-words px-2 pt-2 text-xs leading-5 text-[var(--danger,#dc2626)]"
+            className="mt-2 break-words rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-xs font-semibold leading-5 text-[var(--danger)]"
           >
             {logoutError}
           </p>
@@ -904,7 +927,7 @@ function SidebarPanel({ open, onClose, onCreate }) {
           data-sb-item
           onClick={handleLogout}
           disabled={loggingOut}
-          className={`mt-2 flex h-11 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-medium text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--surface-muted)] hover:text-[var(--danger,#dc2626)] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
+          className={`mt-2 flex h-11 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-semibold text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
         >
           <LogOut size={18} strokeWidth={1.8} className="shrink-0" />
           {loggingOut ? "Logging out..." : "Logout"}
@@ -916,24 +939,21 @@ function SidebarPanel({ open, onClose, onCreate }) {
 
 /* ---------- Sidebar shell ---------- */
 
-/**
- * Controlled by DashboardLayout.
- * On every screen size the sidebar slides in as an overlay drawer with a
- * backdrop, so the page content never shrinks or moves.
- * Closable via backdrop click, Escape, swipe-left or the close button.
- */
 export default function Sidebar({ open, onClose }) {
   const reduceMotion = useReducedMotion();
   const [createOpen, setCreateOpen] = useState(false);
 
-  const transition = reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE };
+  const transition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.45, ease: EASE };
 
-  // Escape closes the drawer (dropdown/dialog stop it first).
   useEffect(() => {
     if (!open) return undefined;
 
     const handleEscape = (event) => {
-      if (event.key === "Escape" && !event.defaultPrevented) onClose();
+      if (event.key === "Escape" && !event.defaultPrevented) {
+        onClose();
+      }
     };
 
     window.addEventListener("keydown", handleEscape);
@@ -956,7 +976,7 @@ export default function Sidebar({ open, onClose }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.3 }}
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
+            className="fixed inset-0 z-40 bg-[var(--overlay)]"
           />
         )}
 
@@ -976,10 +996,14 @@ export default function Sidebar({ open, onClose }) {
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={{ left: 0.35, right: 0 }}
             onDragEnd={(_, info) => {
-              if (info.offset.x < -80 || info.velocity.x < -500) onClose();
+              if (info.offset.x < -80 || info.velocity.x < -500) {
+                onClose();
+              }
             }}
-            style={{ width: `min(${SIDEBAR_WIDTH}px, calc(100vw - 2.5rem))` }}
-            className="fixed inset-y-0 left-0 z-50 border-r border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+            style={{
+              width: `min(${SIDEBAR_WIDTH}px, calc(100vw - 2.5rem))`,
+            }}
+            className="fixed inset-y-0 left-0 z-50 border-r border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-md)]"
           >
             <SidebarPanel
               open={open}
