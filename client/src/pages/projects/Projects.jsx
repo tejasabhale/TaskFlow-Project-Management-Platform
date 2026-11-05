@@ -1,5 +1,4 @@
-
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     FolderKanban,
@@ -12,6 +11,8 @@ import {
     CircleDashed,
     AlertCircle,
     ArrowUpRight,
+    ChevronDown,
+    Check,
 } from "lucide-react";
 
 import { useWorkspace } from "../../context/WorkspaceContext.jsx";
@@ -19,6 +20,16 @@ import { getProjects, createProject } from "../../services/project.service.js";
 import { getTasks } from "../../services/task.service.js";
 
 const projectStatuses = ["Planning", "Active", "Completed", "Archived"];
+
+const filterOptions = [
+    { value: "All", label: "All statuses" },
+    ...projectStatuses.map((status) => ({ value: status, label: status })),
+];
+
+const statusOptions = projectStatuses.map((status) => ({
+    value: status,
+    label: status,
+}));
 
 const statusStyles = {
     Planning: {
@@ -82,13 +93,214 @@ const initialProjectForm = {
     endDate: "",
 };
 
+/**
+ * Themed dropdown.
+ * Native <option> lists are drawn by the browser/OS and ignore most CSS,
+ * so this renders the list with the same theme variables as the rest of the page.
+ */
+function ThemedSelect({
+    id,
+    value,
+    onChange,
+    options,
+    ariaLabel,
+    disabled = false,
+}) {
+    const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    const wrapperRef = useRef(null);
+    const listRef = useRef(null);
+
+    const selectedIndex = Math.max(
+        0,
+        options.findIndex((option) => option.value === value)
+    );
+    const selectedOption = options[selectedIndex];
+    const listId = `${id || "themed-select"}-listbox`;
+
+    const openMenu = () => {
+        if (disabled) return;
+        setActiveIndex(selectedIndex);
+        setOpen(true);
+    };
+
+    const closeMenu = () => setOpen(false);
+
+    const selectOption = (option) => {
+        onChange(option.value);
+        closeMenu();
+    };
+
+    // Close when clicking outside
+    useEffect(() => {
+        if (!open) return undefined;
+
+        const handlePointerDown = (event) => {
+            if (!wrapperRef.current?.contains(event.target)) {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handlePointerDown);
+        return () =>
+            document.removeEventListener("mousedown", handlePointerDown);
+    }, [open]);
+
+    // Keep the highlighted option visible while using the keyboard
+    useEffect(() => {
+        if (!open) return;
+
+        listRef.current
+            ?.querySelector(`[data-index="${activeIndex}"]`)
+            ?.scrollIntoView({ block: "nearest" });
+    }, [open, activeIndex]);
+
+    const handleKeyDown = (event) => {
+        if (disabled) return;
+
+        switch (event.key) {
+            case "ArrowDown":
+                event.preventDefault();
+                if (!open) openMenu();
+                else setActiveIndex((index) => (index + 1) % options.length);
+                break;
+
+            case "ArrowUp":
+                event.preventDefault();
+                if (!open) openMenu();
+                else
+                    setActiveIndex(
+                        (index) => (index - 1 + options.length) % options.length
+                    );
+                break;
+
+            case "Home":
+                if (open) {
+                    event.preventDefault();
+                    setActiveIndex(0);
+                }
+                break;
+
+            case "End":
+                if (open) {
+                    event.preventDefault();
+                    setActiveIndex(options.length - 1);
+                }
+                break;
+
+            case "Enter":
+            case " ":
+                event.preventDefault();
+                if (!open) openMenu();
+                else selectOption(options[activeIndex]);
+                break;
+
+            case "Escape":
+                if (open) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeMenu();
+                }
+                break;
+
+            case "Tab":
+                closeMenu();
+                break;
+
+            default:
+                break;
+        }
+    };
+
+    return (
+        <div ref={wrapperRef} className="relative min-w-0">
+            <button
+                id={id}
+                type="button"
+                role="combobox"
+                aria-label={ariaLabel}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                aria-controls={listId}
+                disabled={disabled}
+                onClick={() => (open ? closeMenu() : openMenu())}
+                onKeyDown={handleKeyDown}
+                className="flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-lg border px-3.5 py-2.5 text-left text-sm outline-none transition-colors focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                    background: "var(--surface)",
+                    color: "var(--text)",
+                    borderColor: open ? "var(--primary)" : "var(--border)",
+                }}
+            >
+                <span className="truncate">{selectedOption?.label}</span>
+
+                <ChevronDown
+                    size={16}
+                    className={`shrink-0 transition-transform ${open ? "rotate-180" : ""
+                        }`}
+                    style={{ color: "var(--text-muted)" }}
+                />
+            </button>
+
+            {open && (
+                <ul
+                    ref={listRef}
+                    id={listId}
+                    role="listbox"
+                    aria-label={ariaLabel}
+                    className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-60 overflow-y-auto rounded-lg border p-1 shadow-lg"
+                    style={{
+                        background: "var(--surface)",
+                        color: "var(--text)",
+                        borderColor: "var(--border)",
+                    }}
+                >
+                    {options.map((option, index) => {
+                        const isSelected = option.value === value;
+                        const isActive = index === activeIndex;
+
+                        return (
+                            <li
+                                key={option.value}
+                                role="option"
+                                aria-selected={isSelected}
+                                data-index={index}
+                                onMouseEnter={() => setActiveIndex(index)}
+                                onMouseDown={(event) => {
+                                    // keep focus on the trigger button
+                                    event.preventDefault();
+                                }}
+                                onClick={() => selectOption(option)}
+                                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-sm"
+                                style={{
+                                    background: isActive
+                                        ? "var(--surface-muted)"
+                                        : "transparent",
+                                    color: isSelected
+                                        ? "var(--primary)"
+                                        : "var(--text)",
+                                    fontWeight: isSelected ? 600 : 400,
+                                }}
+                            >
+                                <span className="truncate">{option.label}</span>
+
+                                {isSelected && (
+                                    <Check size={15} className="shrink-0" />
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 export default function Projects() {
     const {
-        workspaces,
         currentWorkspace: selectedWorkspace,
         currentWorkspaceId: workspaceId,
-        setCurrentWorkspace,
-        loading: loadingWorkspaces,
         canManageMembers,
     } = useWorkspace();
 
@@ -169,7 +381,7 @@ export default function Projects() {
         setSuccessMessage("");
 
         if (!workspaceId) {
-            setCreateError("Please select a workspace.");
+            setCreateError("Please select a workspace first.");
             return;
         }
 
@@ -385,45 +597,16 @@ export default function Projects() {
                 </div>
             )}
 
-            {/* Workspace selector and filters */}
+            {/* Search and status filter */}
             <section
-                className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-[minmax(220px,0.9fr)_minmax(0,2fr)_minmax(170px,0.8fr)]"
+                className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(170px,0.35fr)] sm:p-4"
                 style={{
                     background: "var(--surface)",
                     borderColor: "var(--border)",
                 }}
             >
-                <select
-                    aria-label="Select workspace"
-                    value={workspaceId || ""}
-                    onChange={(event) =>
-                        setCurrentWorkspace(event.target.value)
-                    }
-                    disabled={loadingWorkspaces || workspaces.length === 0}
-                    className="w-full min-w-0 rounded-lg border px-3.5 py-2.5 text-sm outline-none"
-                    style={{
-                        background: "var(--surface)",
-                        borderColor: "var(--border)",
-                        color: "var(--text)",
-                    }}
-                >
-                    {loadingWorkspaces ? (
-                        <option value="">Loading workspaces...</option>
-                    ) : workspaces.length === 0 ? (
-                        <option value="">No workspaces available</option>
-                    ) : (
-                        workspaces.map((workspace) => (
-                            <option
-                                key={getId(workspace)}
-                                value={getId(workspace)}
-                            >
-                                {workspace.name}
-                            </option>
-                        ))
-                    )}
-                </select>
-
-                <div className="relative min-w-0 flex-1">
+                {/* Search */}
+                <div className="relative min-w-0">
                     <Search
                         size={17}
                         className="absolute left-3.5 top-1/2 -translate-y-1/2"
@@ -444,25 +627,14 @@ export default function Projects() {
                     />
                 </div>
 
-                <select
-                    aria-label="Filter projects by status"
+                {/* Status filter */}
+                <ThemedSelect
+                    id="project-status-filter"
+                    ariaLabel="Filter projects by status"
                     value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
-                    className="w-full min-w-0 rounded-lg border px-3.5 py-2.5 text-sm outline-none"
-                    style={{
-                        background: "var(--surface)",
-                        borderColor: "var(--border)",
-                        color: "var(--text)",
-                    }}
-                >
-                    <option value="All">All statuses</option>
-
-                    {projectStatuses.map((status) => (
-                        <option key={status} value={status}>
-                            {status}
-                        </option>
-                    ))}
-                </select>
+                    onChange={setStatusFilter}
+                    options={filterOptions}
+                />
             </section>
 
             {/* Project cards */}
@@ -524,7 +696,8 @@ export default function Projects() {
                                 setProjectForm(initialProjectForm);
                                 setCreateOpen(true);
                             }}
-                            className="mt-5 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white"
+                            disabled={!workspaceId}
+                            className="mt-5 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
                             style={{ background: "var(--primary)" }}
                         >
                             <Plus size={16} />
@@ -572,7 +745,7 @@ export default function Projects() {
                                     </span>
                                 </div>
 
-                                {/* Project name opens ProjectDetails */}
+                                {/* Project name */}
                                 <div className="mt-5">
                                     <p
                                         className="text-xs font-medium"
@@ -854,28 +1027,19 @@ export default function Projects() {
                                     Status
                                 </label>
 
-                                <select
-                                    id="project-status"
-                                    value={projectForm.status}
-                                    onChange={(event) =>
-                                        setProjectForm((current) => ({
-                                            ...current,
-                                            status: event.target.value,
-                                        }))
-                                    }
-                                    className="mt-2 w-full min-w-0 rounded-lg border px-3.5 py-3 text-sm outline-none"
-                                    style={{
-                                        background: "var(--surface)",
-                                        color: "var(--text)",
-                                        borderColor: "var(--border)",
-                                    }}
-                                >
-                                    {projectStatuses.map((status) => (
-                                        <option key={status} value={status}>
-                                            {status}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="mt-2">
+                                    <ThemedSelect
+                                        id="project-status"
+                                        value={projectForm.status}
+                                        onChange={(status) =>
+                                            setProjectForm((current) => ({
+                                                ...current,
+                                                status,
+                                            }))
+                                        }
+                                        options={statusOptions}
+                                    />
+                                </div>
                             </div>
 
                             <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
@@ -960,7 +1124,9 @@ export default function Projects() {
                                     style={{ background: "var(--primary)" }}
                                 >
                                     <Plus size={16} />
-                                    {creatingProject ? "Creating..." : "Create project"}
+                                    {creatingProject
+                                        ? "Creating..."
+                                        : "Create project"}
                                 </button>
                             </div>
                         </form>

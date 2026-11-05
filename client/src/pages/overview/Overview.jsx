@@ -13,12 +13,9 @@ import {
   ArrowRight,
   ArrowUpRight,
   CalendarDays,
-  Check,
   CheckCircle2,
-  ChevronDown,
   Clock3,
   FolderKanban,
-  Layers3,
   ListTodo,
   Loader2,
   RefreshCw,
@@ -52,9 +49,11 @@ const STATUS_BY_KEY = Object.fromEntries(
 
 const getId = (value) => {
   if (!value) return "";
+
   if (typeof value === "object") {
     return String(value._id || value.id || "");
   }
+
   return String(value);
 };
 
@@ -81,6 +80,7 @@ const formatDate = (value) => {
   if (!value) return "No due date";
 
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return "No due date";
 
   return new Intl.DateTimeFormat("en-IN", {
@@ -94,6 +94,7 @@ const isOverdue = (task) => {
   if (!task.dueDate || task.status === "completed") return false;
 
   const dueDate = new Date(task.dueDate);
+
   if (Number.isNaN(dueDate.getTime())) return false;
 
   const today = new Date();
@@ -106,294 +107,14 @@ const isOverdue = (task) => {
 const panelClass =
   "rounded-2xl border border-[var(--border)] bg-[var(--surface)]";
 
-const getWorkspaceInitials = (name = "") =>
-  name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
-    .join("") || "W";
-
-/* ---------------------------------------------------------------
-   Workspace Picker
----------------------------------------------------------------- */
-
-function WorkspacePicker({ workspaces, selectedId, onSelect, loading }) {
-  const rootRef = useRef(null);
-  const triggerRef = useRef(null);
-  const listRef = useRef(null);
-  const optionRefs = useRef([]);
-
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const selectedIndex = workspaces.findIndex(
-    (workspace) => getId(workspace) === selectedId
-  );
-
-  const selectedWorkspace =
-    selectedIndex >= 0 ? workspaces[selectedIndex] : null;
-
-  const disabled = loading || workspaces.length === 0;
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const handlePointerDown = (event) => {
-      if (!rootRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (open) listRef.current?.focus({ preventScroll: true });
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    optionRefs.current[activeIndex]?.scrollIntoView({
-      block: "nearest",
-    });
-  }, [activeIndex, open]);
-
-  const openMenu = (initialIndex = selectedIndex) => {
-    if (disabled) return;
-    setActiveIndex(Math.max(initialIndex, 0));
-    setOpen(true);
-  };
-
-  const closeMenu = (restoreFocus = false) => {
-    setOpen(false);
-    if (restoreFocus) triggerRef.current?.focus();
-  };
-
-  const chooseWorkspace = (workspace) => {
-    if (!workspace) return;
-    onSelect(getId(workspace));
-    closeMenu(true);
-  };
-
-  const handleTriggerKeyDown = (event) => {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      openMenu(Math.max(selectedIndex, 0));
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      openMenu(selectedIndex >= 0 ? selectedIndex : workspaces.length - 1);
-    }
-  };
-
-  const handleListKeyDown = (event) => {
-    const lastIndex = workspaces.length - 1;
-
-    switch (event.key) {
-      case "ArrowDown":
-        event.preventDefault();
-        setActiveIndex((index) => Math.min(index + 1, lastIndex));
-        break;
-      case "ArrowUp":
-        event.preventDefault();
-        setActiveIndex((index) => Math.max(index - 1, 0));
-        break;
-      case "Home":
-        event.preventDefault();
-        setActiveIndex(0);
-        break;
-      case "End":
-        event.preventDefault();
-        setActiveIndex(lastIndex);
-        break;
-      case "Enter":
-      case " ":
-        event.preventDefault();
-        chooseWorkspace(workspaces[activeIndex]);
-        break;
-      case "Escape":
-        event.preventDefault();
-        event.stopPropagation();
-        closeMenu(true);
-        break;
-      case "Tab":
-        closeMenu(false);
-        break;
-      default:
-        break;
-    }
-  };
-
-  return (
-    <div ref={rootRef} className="relative w-full min-w-0 sm:w-[280px]">
-      <label
-        htmlFor="overview-workspace-trigger"
-        className="mb-1.5 block px-0.5 text-xs font-medium text-[var(--text-muted)]"
-      >
-        Workspace
-      </label>
-
-      <button
-        ref={triggerRef}
-        id="overview-workspace-trigger"
-        type="button"
-        onClick={() => (open ? closeMenu() : openMenu())}
-        onKeyDown={handleTriggerKeyDown}
-        disabled={disabled}
-        aria-label="Select workspace"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls="overview-workspace-listbox"
-        className={`group flex min-h-12 w-full items-center gap-3 rounded-xl border bg-[var(--surface)] px-3 py-2 text-left outline-none transition-colors duration-150 hover:border-[var(--border-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-60 ${open
-            ? "border-[var(--primary)]"
-            : "border-[var(--border)]"
-          }`}
-      >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
-          <Layers3 size={17} strokeWidth={1.9} />
-        </span>
-
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-[var(--text)]">
-            {loading
-              ? "Loading workspaces..."
-              : selectedWorkspace?.name || "No workspaces available"}
-          </span>
-          <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">
-            {selectedWorkspace
-              ? "Currently selected"
-              : loading
-                ? "Please wait"
-                : "No workspace to select"}
-          </span>
-        </span>
-
-        <ChevronDown
-          size={16}
-          aria-hidden="true"
-          className={`shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${open ? "rotate-180 text-[var(--primary)]" : ""
-            }`}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 text-[var(--text)] shadow-lg sm:w-[320px]">
-          <div className="flex items-center justify-between gap-3 px-2 pb-2.5 pt-1">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--text)]">
-                Switch workspace
-              </p>
-              <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                Choose where you want to work
-              </p>
-            </div>
-
-            <span className="shrink-0 rounded-md bg-[var(--surface-muted)] px-2 py-1 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
-              {workspaces.length}{" "}
-              {workspaces.length === 1 ? "space" : "spaces"}
-            </span>
-          </div>
-
-          <div
-            ref={listRef}
-            id="overview-workspace-listbox"
-            role="listbox"
-            aria-label="Available workspaces"
-            aria-activedescendant={`overview-workspace-option-${activeIndex}`}
-            tabIndex={-1}
-            onKeyDown={handleListKeyDown}
-            className="max-h-64 space-y-1 overflow-y-auto overscroll-contain border-y border-[var(--border)] py-2 outline-none"
-          >
-            {workspaces.map((workspace, index) => {
-              const isSelected = getId(workspace) === selectedId;
-              const isActive = index === activeIndex;
-
-              return (
-                <button
-                  ref={(element) => {
-                    optionRefs.current[index] = element;
-                  }}
-                  id={`overview-workspace-option-${index}`}
-                  key={getId(workspace)}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  tabIndex={-1}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => chooseWorkspace(workspace)}
-                  className={`flex min-h-[54px] w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ${isSelected
-                      ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : isActive
-                        ? "bg-[var(--surface-muted)] text-[var(--text)]"
-                        : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
-                    }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold ${isSelected
-                        ? "bg-[var(--surface)] text-[var(--primary)]"
-                        : "bg-[var(--surface-muted)] text-[var(--text-muted)]"
-                      }`}
-                  >
-                    {getWorkspaceInitials(workspace.name)}
-                  </span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">
-                      {workspace.name || "Untitled workspace"}
-                    </span>
-                    <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">
-                      {workspace.description ||
-                        (isSelected ? "Currently active" : "Switch workspace")}
-                    </span>
-                  </span>
-
-                  {isSelected && (
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--primary)]">
-                      <Check size={14} strokeWidth={2.5} />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="px-2 pb-0.5 pt-2 text-[11px] leading-5 text-[var(--text-subtle)]">
-            Your tasks and projects update when you switch workspaces.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ---------------------------------------------------------------
    Overview Dashboard
 ---------------------------------------------------------------- */
 
 export default function Overview() {
   const {
-    workspaces,
     currentWorkspace,
     currentWorkspaceId,
-    setCurrentWorkspace,
-    loading: loadingWorkspaces,
   } = useWorkspace();
 
   const [projects, setProjects] = useState([]);
@@ -412,6 +133,7 @@ export default function Overview() {
     link.id = DISPLAY_FONT_ID;
     link.rel = "stylesheet";
     link.href = DISPLAY_FONT_URL;
+
     document.head.appendChild(link);
   }, []);
 
@@ -456,6 +178,7 @@ export default function Overview() {
           err?.message ||
           "Unable to load workspace overview."
         );
+
         setProjects([]);
         setTasks([]);
       } finally {
@@ -506,10 +229,12 @@ export default function Overview() {
     acc[status.key] = tasks.filter(
       (task) => (task.status || "todo") === status.key
     ).length;
+
     return acc;
   }, {});
 
   const overdue = tasks.filter(isOverdue).length;
+
   const completedPercent = total
     ? Math.round((countByStatus.completed / total) * 100)
     : 0;
@@ -556,9 +281,11 @@ export default function Overview() {
   const projectRows = projects
     .map((project) => {
       const id = getId(project);
+
       const projectTasks = tasks.filter(
         (task) => getId(task.project) === id
       );
+
       const done = projectTasks.filter(
         (task) => task.status === "completed"
       ).length;
@@ -644,37 +371,24 @@ export default function Overview() {
           <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
             {currentWorkspace?.name
               ? `A snapshot of tasks and project progress in ${currentWorkspace.name}.`
-              : "Choose a workspace to see your team's tasks and project progress."}
+              : "Your tasks and project progress will appear here once a workspace is selected."}
           </p>
         </div>
 
-        <div className="flex w-full min-w-0 items-end gap-2 sm:w-auto sm:gap-3">
-          <div className="min-w-0 flex-1 sm:flex-none">
-            <WorkspacePicker
-              workspaces={workspaces}
-              selectedId={currentWorkspaceId || ""}
-              onSelect={setCurrentWorkspace}
-              loading={loadingWorkspaces}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => loadData("refresh")}
-            disabled={!currentWorkspaceId || refreshing || loadingData}
-            aria-label="Refresh overview"
-            title="Refresh overview"
-            className="inline-flex size-12 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-auto sm:px-4"
-          >
-            <RefreshCw
-              size={16}
-              className={refreshing ? "animate-spin" : ""}
-            />
-            <span className="hidden sm:inline">
-              {refreshing ? "Refreshing" : "Refresh"}
-            </span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => loadData("refresh")}
+          disabled={!currentWorkspaceId || refreshing || loadingData}
+          aria-label="Refresh overview"
+          title="Refresh overview"
+          className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--text-muted)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        >
+          <RefreshCw
+            size={16}
+            className={refreshing ? "animate-spin" : ""}
+          />
+          {refreshing ? "Refreshing" : "Refresh"}
+        </button>
       </header>
 
       {/* Error */}
@@ -687,6 +401,7 @@ export default function Overview() {
             <AlertCircle size={17} className="mt-0.5 shrink-0" />
             {error}
           </span>
+
           <button
             type="button"
             onClick={() => loadData("initial")}
@@ -703,6 +418,7 @@ export default function Overview() {
           <h2 className="text-sm font-semibold text-[var(--text)]">
             At a glance
           </h2>
+
           {currentWorkspace && (
             <span className="truncate text-xs text-[var(--text-subtle)]">
               {currentWorkspace.name}
@@ -713,6 +429,7 @@ export default function Overview() {
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
+
             const toneClass =
               stat.tone === "success"
                 ? "text-[var(--success)]"
@@ -769,6 +486,7 @@ export default function Overview() {
               <h2 className="text-sm font-semibold text-[var(--text)] sm:text-base">
                 Recent tasks
               </h2>
+
               <p className="mt-1 text-xs leading-5 text-[var(--text-muted)] sm:text-sm">
                 The latest activity in this workspace.
               </p>
@@ -790,6 +508,7 @@ export default function Overview() {
                 size={22}
                 className="animate-spin text-[var(--primary)]"
               />
+
               <p className="mt-3 text-sm text-[var(--text-muted)]">
                 Loading tasks...
               </p>
@@ -799,14 +518,17 @@ export default function Overview() {
               <span className="flex size-11 items-center justify-center rounded-xl bg-[var(--surface-muted)] text-[var(--text-muted)]">
                 <ListTodo size={20} />
               </span>
+
               <p className="mt-3 text-sm font-semibold text-[var(--text)]">
                 {currentWorkspace ? "No tasks yet" : "No workspace selected"}
               </p>
+
               <p className="mt-1 max-w-xs text-xs leading-5 text-[var(--text-muted)] sm:text-sm">
                 {currentWorkspace
                   ? "Tasks created in this workspace will appear here."
                   : "Select a workspace to see its latest tasks."}
               </p>
+
               <Link
                 to="/dashboard/tasks"
                 className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--primary)] hover:underline sm:text-sm"
@@ -858,7 +580,9 @@ export default function Overview() {
                           </td>
 
                           <td className="max-w-[150px] truncate px-4 py-4 text-[var(--text-muted)]">
-                            {task.project?.name || task.project?.title || "—"}
+                            {task.project?.name ||
+                              task.project?.title ||
+                              "—"}
                           </td>
 
                           <td className="px-4 py-4">
@@ -872,6 +596,7 @@ export default function Overview() {
                               }`}
                           >
                             {formatDate(task.dueDate)}
+
                             {late && (
                               <span className="sr-only"> (overdue)</span>
                             )}
@@ -954,6 +679,7 @@ export default function Overview() {
                 <h2 className="text-sm font-semibold text-[var(--text)] sm:text-base">
                   Task status
                 </h2>
+
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
                   Breakdown by workflow stage.
                 </p>
@@ -967,6 +693,7 @@ export default function Overview() {
             <div className="mt-5 space-y-4">
               {STATUSES.map((status) => {
                 const count = countByStatus[status.key] || 0;
+
                 const percent = total
                   ? Math.round((count / total) * 100)
                   : 0;
@@ -980,6 +707,7 @@ export default function Overview() {
                           className="size-2 shrink-0 rounded-full"
                           style={{ background: status.color }}
                         />
+
                         <span className="truncate">{status.label}</span>
                       </span>
 
@@ -1017,6 +745,7 @@ export default function Overview() {
                 <h2 className="text-sm font-semibold text-[var(--text)] sm:text-base">
                   Projects
                 </h2>
+
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
                   Progress across your projects.
                 </p>
@@ -1082,7 +811,9 @@ export default function Overview() {
                       )}
 
                       <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-muted)]">
-                        {project.total ? `${project.percent}%` : "No tasks"}
+                        {project.total
+                          ? `${project.percent}%`
+                          : "No tasks"}
                       </span>
                     </div>
 

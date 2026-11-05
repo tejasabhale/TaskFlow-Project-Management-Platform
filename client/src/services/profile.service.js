@@ -11,6 +11,20 @@ export const getUserProfileById = async (userId) => {
 };
 
 export const updateMyProfile = async (payload) => {
-  const response = await api.patch("/profile/me", payload);
+  const isFormData =
+    typeof FormData !== "undefined" && payload instanceof FormData;
+
+  const response = await api.patch(
+    "/profile/me",
+    payload,
+    isFormData
+      ? {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      : undefined,
+  );
+
   return response.data;
 };

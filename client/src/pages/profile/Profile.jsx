@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
@@ -7,6 +8,7 @@ import {
     Check,
     CircleAlert,
     Clock,
+    ImagePlus,
     Mail,
     Pencil,
     Phone,
@@ -28,11 +30,10 @@ const motion =
 const focusRing =
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]";
 
-// The layout no longer pads the outlet, so the page pads itself.
-const pageClass = "mx-auto w-full max-w-5xl space-y-4 p-4 sm:p-6";
+const pageClass = "mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6";
 
 const cardClass =
-    "rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm";
+    "rounded-xl border border-[var(--border)] bg-[var(--surface)]";
 
 const iconButtonClass =
     "flex size-9 shrink-0 items-center justify-center rounded-lg border border-transparent " +
@@ -44,10 +45,30 @@ const sectionLabelClass =
     "text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--text-subtle)]";
 
 const fieldClass =
-    "mt-1.5 w-full min-h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm " +
-    "text-[var(--text)] outline-none transition-colors " +
-    "placeholder:text-[var(--text-subtle)] hover:border-[var(--border-strong)] " +
-    `focus:border-[var(--primary)] ${focusRing}`;
+    "mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm " +
+    "text-[var(--text)] outline-none transition " +
+    "placeholder:text-[var(--text-subtle)] " +
+    "focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--focus,var(--primary))]/30";
+
+const secondaryButtonClass =
+    "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] " +
+    "px-3 py-2.5 text-sm font-medium text-[var(--text)] transition hover:brightness-95 " +
+    "disabled:cursor-not-allowed disabled:opacity-50 " +
+    focusRing;
+
+const primaryButtonClass =
+    "inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm " +
+    "font-medium text-white transition hover:brightness-110 " +
+    "disabled:cursor-not-allowed disabled:opacity-50 " +
+    focusRing;
+
+const allowedAvatarTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+];
+
+const maxAvatarSize = 5 * 1024 * 1024;
 
 const getInitials = (name = "") =>
     name
@@ -58,7 +79,7 @@ const getInitials = (name = "") =>
         .map((part) => part[0].toUpperCase())
         .join("") || "U";
 
-// Backend responds with ApiResponse: { statusCode, data: user, message }
+// Backend response: { statusCode, data: user, message }.
 function unwrapProfile(response) {
     let result = response?.data ?? response;
 
@@ -69,14 +90,18 @@ function unwrapProfile(response) {
 }
 
 const getErrorMessage = (error, fallback) =>
-    error?.response?.data?.message || error?.message || fallback;
+    error?.response?.data?.message ||
+    error?.message ||
+    fallback;
 
 const formatDate = (value) => {
     if (!value) return "Not available";
 
     const date = new Date(value);
 
-    if (Number.isNaN(date.getTime())) return "Not available";
+    if (Number.isNaN(date.getTime())) {
+        return "Not available";
+    }
 
     return date.toLocaleDateString(undefined, {
         day: "numeric",
@@ -86,7 +111,9 @@ const formatDate = (value) => {
 };
 
 const formatRole = (role = "") =>
-    role ? role.charAt(0).toUpperCase() + role.slice(1) : "User";
+    role
+        ? role.charAt(0).toUpperCase() + role.slice(1)
+        : "User";
 
 /* ---------- Small building blocks ---------- */
 
@@ -100,7 +127,7 @@ function Badge({ icon: Icon, children, tone = "primary" }) {
 
     return (
         <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${tones[tone]}`}
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${tones[tone]}`}
         >
             <Icon size={12} strokeWidth={2.2} aria-hidden="true" />
             {children}
@@ -110,16 +137,19 @@ function Badge({ icon: Icon, children, tone = "primary" }) {
 
 function DetailItem({ icon: Icon, label, children }) {
     return (
-        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-sm transition-[border-color,transform] duration-200 hover:-translate-y-px hover:border-[var(--primary)] motion-reduce:transition-none">
+        <div
+            className={`flex min-w-0 items-center gap-3 p-4 transition-colors duration-200 hover:border-[var(--primary)] ${cardClass}`}
+        >
             <span
                 aria-hidden="true"
-                className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]"
             >
                 <Icon size={18} strokeWidth={1.8} />
             </span>
 
             <div className="min-w-0">
                 <p className={sectionLabelClass}>{label}</p>
+
                 <div className="mt-0.5 truncate text-sm font-semibold text-[var(--text)]">
                     {children}
                 </div>
@@ -128,17 +158,32 @@ function DetailItem({ icon: Icon, label, children }) {
     );
 }
 
-function FormField({ label, id, hint, ...props }) {
+function FormField({ label, id, hint, icon: Icon, ...props }) {
     return (
         <div className="min-w-0">
-            <label htmlFor={id} className="text-sm font-medium text-[var(--text)]">
+            <label
+                htmlFor={id}
+                className="flex items-center gap-1.5 text-sm font-medium text-[var(--text)]"
+            >
+                {Icon && (
+                    <Icon
+                        size={14}
+                        aria-hidden="true"
+                        className="text-[var(--text-muted)]"
+                    />
+                )}
+
                 {label}
             </label>
 
-            <input {...props} id={id} className={fieldClass} />
+            <input
+                {...props}
+                id={id}
+                className={fieldClass}
+            />
 
             {hint && (
-                <p className="mt-1 text-xs leading-5 text-[var(--text-subtle)]">
+                <p className="mt-1.5 text-xs text-[var(--text-muted)]">
                     {hint}
                 </p>
             )}
@@ -176,15 +221,17 @@ function ProfileSkeleton() {
             aria-live="polite"
             aria-label="Loading profile"
         >
-            <div className={`overflow-hidden ${cardClass}`}>
-                <div className={`h-24 ${pulse}`} />
-
-                <div className="px-4 pb-4 sm:px-5">
+            <div className={`p-5 sm:p-6 ${cardClass}`}>
+                <div className="flex items-center gap-4">
                     <div
-                        className={`-mt-10 size-20 rounded-2xl ring-4 ring-[var(--surface)] ${pulse}`}
+                        className={`size-20 shrink-0 rounded-full ${pulse}`}
                     />
-                    <div className={`mt-3 h-5 w-40 rounded-lg ${pulse}`} />
-                    <div className={`mt-2 h-3.5 w-24 rounded-lg ${pulse}`} />
+
+                    <div className="flex-1 space-y-2">
+                        <div className={`h-5 w-40 rounded-lg ${pulse}`} />
+                        <div className={`h-3.5 w-24 rounded-lg ${pulse}`} />
+                        <div className={`h-5 w-32 rounded-full ${pulse}`} />
+                    </div>
                 </div>
             </div>
 
@@ -192,9 +239,10 @@ function ProfileSkeleton() {
                 {Array.from({ length: 6 }).map((_, index) => (
                     <div
                         key={index}
-                        className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3"
+                        className={`flex items-center gap-3 p-4 ${cardClass}`}
                     >
-                        <div className={`size-10 rounded-xl ${pulse}`} />
+                        <div className={`size-10 rounded-full ${pulse}`} />
+
                         <div className="flex-1 space-y-1.5">
                             <div className={`h-2.5 w-16 rounded ${pulse}`} />
                             <div className={`h-3.5 w-28 rounded ${pulse}`} />
@@ -214,21 +262,43 @@ function EditProfileDialog({ profile, onClose, onSaved }) {
         userName: profile.userName || "",
         mobileNo: profile.mobileNo || "",
     });
+
+    const [avatarFile, setAvatarFile] = useState(null);
+    const [avatarPreview, setAvatarPreview] = useState(
+        profile.avatar?.url || ""
+    );
+
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [shown, setShown] = useState(false);
 
-    // Animate in after the first paint.
+    // Animate the dialog in.
     useEffect(() => {
         const frame = requestAnimationFrame(() => setShown(true));
 
         return () => cancelAnimationFrame(frame);
     }, []);
 
-    // Close on Escape (unless a save is in progress).
+    // Create and clean up the local image preview.
+    useEffect(() => {
+        if (!avatarFile) {
+            setAvatarPreview(profile.avatar?.url || "");
+            return undefined;
+        }
+
+        const objectUrl = URL.createObjectURL(avatarFile);
+
+        setAvatarPreview(objectUrl);
+
+        return () => URL.revokeObjectURL(objectUrl);
+    }, [avatarFile, profile.avatar?.url]);
+
+    // Close on Escape.
     useEffect(() => {
         const handleKeyDown = (event) => {
-            if (event.key === "Escape" && !saving) onClose();
+            if (event.key === "Escape" && !saving) {
+                onClose();
+            }
         };
 
         window.addEventListener("keydown", handleKeyDown);
@@ -241,6 +311,7 @@ function EditProfileDialog({ profile, onClose, onSaved }) {
     // Prevent background scrolling while the dialog is open.
     useEffect(() => {
         const previousOverflow = document.body.style.overflow;
+
         document.body.style.overflow = "hidden";
 
         return () => {
@@ -256,7 +327,31 @@ function EditProfileDialog({ profile, onClose, onSaved }) {
                     ? event.target.value.toLowerCase().replace(/\s/g, "")
                     : event.target.value;
 
-        setForm((current) => ({ ...current, [name]: value }));
+        setForm((current) => ({
+            ...current,
+            [name]: value,
+        }));
+    };
+
+    const handleAvatarChange = (event) => {
+        const file = event.target.files?.[0];
+
+        if (!file) return;
+
+        if (!allowedAvatarTypes.includes(file.type)) {
+            setError("Please select a JPG, PNG, or WebP image.");
+            event.target.value = "";
+            return;
+        }
+
+        if (file.size > maxAvatarSize) {
+            setError("Avatar image must be 5 MB or smaller.");
+            event.target.value = "";
+            return;
+        }
+
+        setError("");
+        setAvatarFile(file);
     };
 
     const handleSubmit = async (event) => {
@@ -282,30 +377,49 @@ function EditProfileDialog({ profile, onClose, onSaved }) {
             return;
         }
 
-        // Only send what actually changed.
+        // Add only the fields that have changed.
         const changes = {};
 
-        if (fullName !== (profile.fullName || "")) changes.fullName = fullName;
-        if (userName !== (profile.userName || "")) changes.userName = userName;
-        if (mobileNo !== (profile.mobileNo || "")) changes.mobileNo = mobileNo;
+        if (fullName !== (profile.fullName || "")) {
+            changes.fullName = fullName;
+        }
 
-        if (Object.keys(changes).length === 0) {
+        if (userName !== (profile.userName || "")) {
+            changes.userName = userName;
+        }
+
+        if (mobileNo !== (profile.mobileNo || "")) {
+            changes.mobileNo = mobileNo;
+        }
+
+        if (Object.keys(changes).length === 0 && !avatarFile) {
             onClose();
             return;
+        }
+
+        // Send text fields and the optional avatar in one multipart request.
+        const payload = new FormData();
+
+        Object.entries(changes).forEach(([key, value]) => {
+            payload.append(key, value);
+        });
+
+        if (avatarFile) {
+            payload.append("avatar", avatarFile);
         }
 
         try {
             setSaving(true);
 
-            const response = await updateMyProfile(changes);
+            const response = await updateMyProfile(payload);
 
-            await onSaved(unwrapProfile(response));
+            onSaved(unwrapProfile(response));
         } catch (requestError) {
             setError(
                 getErrorMessage(
                     requestError,
-                    "Unable to update profile. Please try again.",
-                ),
+                    "Unable to update profile. Please try again."
+                )
             );
         } finally {
             setSaving(false);
@@ -316,25 +430,38 @@ function EditProfileDialog({ profile, onClose, onSaved }) {
         <div
             className={`fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/45 px-4 py-5 backdrop-blur-[2px] transition-opacity duration-200 sm:py-8 ${shown ? "opacity-100" : "opacity-0"
                 }`}
+            data-lenis-prevent
             onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !saving) onClose();
+                if (
+                    event.target === event.currentTarget &&
+                    !saving
+                ) {
+                    onClose();
+                }
             }}
         >
             <section
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="edit-profile-title"
-                className={`my-auto max-h-[calc(100dvh-2.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-2xl transition-[opacity,transform] sm:p-5 ${motion} ${shown
+                className={`my-auto max-h-[calc(100dvh-2.5rem)] w-full max-w-lg overflow-y-auto shadow-2xl text-[var(--text)] ${cardClass} ${motion} ${shown
                         ? "translate-y-0 scale-100 opacity-100"
                         : "translate-y-2 scale-[0.98] opacity-0"
                     }`}
             >
                 {/* Header */}
-                <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
+                <div className="flex items-center gap-3 border-b border-[var(--border)] p-4">
+                    <div
+                        aria-hidden="true"
+                        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]"
+                    >
+                        <Pencil size={18} />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
                         <h2
                             id="edit-profile-title"
-                            className="font-['Plus_Jakarta_Sans',sans-serif] text-lg font-bold tracking-[-0.035em]"
+                            className="font-semibold"
                         >
                             Edit profile
                         </h2>
@@ -349,77 +476,154 @@ function EditProfileDialog({ profile, onClose, onSaved }) {
                         onClick={onClose}
                         disabled={saving}
                         aria-label="Close dialog"
-                        className={`${iconButtonClass} -mr-1 -mt-1`}
+                        className={iconButtonClass}
                     >
                         <X size={18} />
                     </button>
                 </div>
 
-                {error && (
-                    <div
-                        role="alert"
-                        className="mt-3 rounded-xl border border-[var(--danger,#dc2626)]/40 bg-[var(--surface-muted)] px-3 py-2 text-sm leading-6 text-[var(--danger,#dc2626)]"
-                    >
-                        {error}
-                    </div>
-                )}
+                <form onSubmit={handleSubmit}>
+                    <div className="space-y-4 p-4 sm:p-5">
+                        {error && (
+                            <div
+                                role="alert"
+                                className="rounded-lg border px-4 py-3 text-sm"
+                                style={{
+                                    color: "var(--danger, #b42318)",
+                                    borderColor:
+                                        "color-mix(in srgb, var(--danger, #b42318) 35%, transparent)",
+                                    background:
+                                        "color-mix(in srgb, var(--danger, #b42318) 10%, transparent)",
+                                }}
+                            >
+                                {error}
+                            </div>
+                        )}
 
-                <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
-                    <FormField
-                        id="edit-full-name"
-                        label="Full name"
-                        type="text"
-                        value={form.fullName}
-                        onChange={updateField("fullName")}
-                        minLength={2}
-                        maxLength={100}
-                        autoComplete="name"
-                        required
-                        autoFocus
-                    />
+                        {/* Avatar upload */}
+                        <div>
+                            <p className="mb-2 text-sm font-medium text-[var(--text)]">
+                                Profile picture
+                            </p>
 
-                    <div className="grid gap-3.5 sm:grid-cols-2">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <Avatar
+                                    src={avatarPreview}
+                                    name={profile.fullName || profile.userName}
+                                    className="size-16 rounded-full text-lg ring-2 ring-[var(--border)]"
+                                />
+
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <input
+                                            id="edit-avatar"
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp"
+                                            onChange={handleAvatarChange}
+                                            disabled={saving}
+                                            className="sr-only"
+                                        />
+
+                                        <label
+                                            htmlFor="edit-avatar"
+                                            className={`${secondaryButtonClass} cursor-pointer`}
+                                        >
+                                            <ImagePlus size={15} />
+                                            {avatarFile ? "Change image" : "Upload image"}
+                                        </label>
+
+                                        {avatarFile && (
+                                            <button
+                                                type="button"
+                                                disabled={saving}
+                                                onClick={() => setAvatarFile(null)}
+                                                className="text-xs font-medium text-[var(--text-muted)] underline underline-offset-4 hover:text-[var(--text)] disabled:opacity-50"
+                                            >
+                                                Cancel image
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <p className="mt-2 break-all text-xs text-[var(--text-muted)]">
+                                        {avatarFile
+                                            ? avatarFile.name
+                                            : "JPG, PNG, or WebP. Maximum size: 5 MB."}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         <FormField
-                            id="edit-user-name"
-                            label="Username"
+                            id="edit-full-name"
+                            label="Full name"
+                            icon={UserRound}
                             type="text"
-                            value={form.userName}
-                            onChange={updateField("userName")}
-                            minLength={3}
-                            maxLength={30}
-                            autoComplete="username"
+                            value={form.fullName}
+                            onChange={updateField("fullName")}
+                            minLength={2}
+                            maxLength={100}
+                            autoComplete="name"
                             required
+                            autoFocus
                         />
 
-                        <FormField
-                            id="edit-mobile"
-                            label="Mobile number"
-                            type="tel"
-                            inputMode="numeric"
-                            value={form.mobileNo}
-                            onChange={updateField("mobileNo")}
-                            placeholder="10 digit number"
-                            autoComplete="tel-national"
-                            required
-                        />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <FormField
+                                id="edit-user-name"
+                                label="Username"
+                                icon={AtSign}
+                                type="text"
+                                value={form.userName}
+                                onChange={updateField("userName")}
+                                minLength={3}
+                                maxLength={30}
+                                autoComplete="username"
+                                hint="3 to 30 characters, no spaces."
+                                required
+                            />
+
+                            <FormField
+                                id="edit-mobile"
+                                label="Mobile number"
+                                icon={Phone}
+                                type="tel"
+                                inputMode="numeric"
+                                value={form.mobileNo}
+                                onChange={updateField("mobileNo")}
+                                placeholder="10 digit number"
+                                autoComplete="tel-national"
+                                hint="Digits only."
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--text)]">
+                                <Mail
+                                    size={14}
+                                    aria-hidden="true"
+                                    className="text-[var(--text-muted)]"
+                                />
+                                Email
+                            </p>
+
+                            <p className="mt-1.5 truncate rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--text-muted)]">
+                                {profile.email || "Not available"}
+                            </p>
+
+                            <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+                                Email cannot be changed here.
+                            </p>
+                        </div>
                     </div>
 
-                    <div>
-                        <p className="text-sm font-medium text-[var(--text)]">Email</p>
-                        <p className="mt-1.5 truncate rounded-xl border border-dashed border-[var(--border)] px-3 py-2 text-sm text-[var(--text-muted)]">
-                            {profile.email || "Not available"}
-                        </p>
-                        <p className="mt-1 text-xs text-[var(--text-subtle)]">
-                            Email can&apos;t be changed here.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col-reverse gap-2.5 border-t border-[var(--border)] pt-3.5 sm:flex-row sm:justify-end">
+                    {/* Footer actions */}
+                    <div className="flex flex-col-reverse gap-2 rounded-b-xl border-t border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-5">
                         <button
                             type="button"
                             onClick={onClose}
                             disabled={saving}
-                            className={`inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--border)] px-4 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
+                            className={secondaryButtonClass}
                         >
                             Cancel
                         </button>
@@ -427,9 +631,9 @@ function EditProfileDialog({ profile, onClose, onSaved }) {
                         <button
                             type="submit"
                             disabled={saving}
-                            className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--primary)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
+                            className={primaryButtonClass}
                         >
-                            <Check size={16} />
+                            <Check size={16} aria-hidden="true" />
                             {saving ? "Saving..." : "Save changes"}
                         </button>
                     </div>
@@ -439,12 +643,11 @@ function EditProfileDialog({ profile, onClose, onSaved }) {
     );
 }
 
-/* ---------- Page ---------- */
+/* ---------- Profile page ---------- */
 
 export default function Profile() {
-    // /dashboard/profile shows your own profile.
-    // /dashboard/profile/:userId shows another user's profile.
     const { userId } = useParams();
+
     const isOwnProfile = !userId;
 
     const [profile, setProfile] = useState(null);
@@ -483,14 +686,17 @@ export default function Profile() {
                 if (cancelled) return;
 
                 setProfile(null);
+
                 setError(
                     getErrorMessage(
                         requestError,
-                        "Unable to load profile. Please try again.",
-                    ),
+                        "Unable to load profile. Please try again."
+                    )
                 );
             } finally {
-                if (!cancelled) setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         };
 
@@ -510,21 +716,34 @@ export default function Profile() {
         return () => clearTimeout(timer);
     }, [notice]);
 
-    const retry = useCallback(() => setReloadKey((key) => key + 1), []);
+    const retry = useCallback(
+        () => setReloadKey((key) => key + 1),
+        []
+    );
 
-    const closeEditDialog = useCallback(() => setEditOpen(false), []);
+    const closeEditDialog = useCallback(
+        () => setEditOpen(false),
+        []
+    );
 
-    // The PATCH response returns the updated profile, so no extra request needed.
+    // The PATCH response contains the updated profile.
     const handleSaved = useCallback((updatedProfile) => {
         if (updatedProfile && typeof updatedProfile === "object") {
-            setProfile((current) => ({ ...current, ...updatedProfile }));
+            setProfile((current) => ({
+                ...current,
+                ...updatedProfile,
+            }));
+
+            setAvatarFailed(false);
         }
 
         setEditOpen(false);
         setNotice("Profile updated successfully.");
     }, []);
 
-    if (loading) return <ProfileSkeleton />;
+    if (loading) {
+        return <ProfileSkeleton />;
+    }
 
     if (error || !profile) {
         return (
@@ -533,12 +752,12 @@ export default function Profile() {
                     role="alert"
                     className={`mx-auto flex max-w-sm flex-col items-center px-5 py-8 text-center ${cardClass}`}
                 >
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-[var(--surface-muted)] text-[var(--danger,#dc2626)]">
+                    <span className="flex size-11 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[var(--danger,#dc2626)]">
                         <CircleAlert size={21} />
                     </span>
 
-                    <h2 className="mt-3 font-['Plus_Jakarta_Sans',sans-serif] text-base font-bold tracking-[-0.03em] text-[var(--text)]">
-                        Couldn&apos;t load profile
+                    <h2 className="mt-3 text-base font-semibold text-[var(--text)]">
+                        Could not load profile
                     </h2>
 
                     <p className="mt-1.5 text-sm leading-6 text-[var(--text-muted)]">
@@ -548,7 +767,7 @@ export default function Profile() {
                     <button
                         type="button"
                         onClick={retry}
-                        className={`mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--primary)] bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--text-inverse)] transition-opacity hover:opacity-90 ${focusRing}`}
+                        className={`mt-4 ${primaryButtonClass}`}
                     >
                         <RefreshCw size={15} />
                         Try again
@@ -558,93 +777,135 @@ export default function Profile() {
         );
     }
 
-    const displayName = profile.fullName || profile.userName || "Unnamed user";
-    const avatarUrl = avatarFailed ? "" : profile.avatar?.url || "";
+    const displayName =
+        profile.fullName ||
+        profile.userName ||
+        "Unnamed user";
+
+    const avatarUrl = avatarFailed
+        ? ""
+        : profile.avatar?.url || "";
+
     const isAdmin = profile.role === "admin";
 
     return (
         <div
             className={`${pageClass} [animation:profile-in_0.4s_ease-out_both] motion-reduce:[animation:none]`}
         >
-            {/* Entrance animation: always ends fully visible */}
-            <style>{`@keyframes profile-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
+            <style>
+                {`
+                    @keyframes profile-in {
+                        from {
+                            opacity: 0;
+                            transform: translateY(8px);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: none;
+                        }
+                    }
+                `}
+            </style>
+
+            {/* Page heading */}
+            <section>
+                <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
+                    Profile
+                </h1>
+
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                    {isOwnProfile
+                        ? "Your personal and account details."
+                        : "Member details and account information."}
+                </p>
+            </section>
 
             {/* Success message */}
             {notice && (
                 <div
                     role="status"
-                    className="flex items-center gap-2 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary-soft)] px-3 py-2 text-sm font-medium text-[var(--primary)]"
+                    className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm"
+                    style={{
+                        color: "var(--success, #187044)",
+                        borderColor:
+                            "color-mix(in srgb, var(--success, #187044) 35%, transparent)",
+                        background:
+                            "color-mix(in srgb, var(--success, #187044) 10%, transparent)",
+                    }}
                 >
                     <Check size={16} aria-hidden="true" />
                     {notice}
                 </div>
             )}
 
-            {/* Header card */}
+            {/* Profile header - no banner */}
             <section
                 aria-labelledby="profile-name"
-                className={`overflow-hidden ${cardClass}`}
+                className={`p-4 sm:p-6 ${cardClass}`}
             >
-                {/* Banner */}
-                <div className="h-24 bg-gradient-to-r from-[var(--primary)] to-[color-mix(in_srgb,var(--primary)_40%,var(--surface))] sm:h-28" />
-
-                <div className="px-4 pb-4 sm:px-5">
-                    <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                    {/* Avatar and identity */}
+                    <div className="flex min-w-0 items-center gap-4">
                         <Avatar
                             src={avatarUrl}
                             name={displayName}
                             onError={() => setAvatarFailed(true)}
-                            className="-mt-10 size-20 rounded-2xl text-xl shadow-sm ring-4 ring-[var(--surface)] sm:-mt-12 sm:size-24 sm:text-2xl"
+                            className="size-20 rounded-full text-xl ring-4 ring-[var(--surface-muted)] sm:size-24 sm:text-2xl"
                         />
 
-                        {isOwnProfile && (
-                            <button
-                                type="button"
-                                onClick={() => setEditOpen(true)}
-                                className={`mt-3 inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm font-medium text-[var(--text)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)] ${focusRing}`}
+                        <div className="min-w-0">
+                            <h2
+                                id="profile-name"
+                                className="break-words text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl"
                             >
-                                <Pencil size={15} />
-                                Edit profile
-                            </button>
-                        )}
-                    </div>
+                                {displayName}
+                            </h2>
 
-                    <div className="mt-3 min-w-0">
-                        <h2
-                            id="profile-name"
-                            className="truncate font-['Plus_Jakarta_Sans',sans-serif] text-xl font-bold tracking-[-0.035em] text-[var(--text)]"
-                        >
-                            {displayName}
-                        </h2>
-
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                             {profile.userName && (
-                                <p className="truncate text-sm text-[var(--text-muted)]">
+                                <p className="mt-1 text-sm text-[var(--text-muted)]">
                                     @{profile.userName}
                                 </p>
                             )}
 
-                            <Badge icon={isAdmin ? ShieldCheck : UserRound}>
-                                {formatRole(profile.role)}
-                            </Badge>
-
-                            {profile.isVerified ? (
-                                <Badge icon={BadgeCheck}>Verified</Badge>
-                            ) : (
-                                <Badge icon={Clock} tone="muted">
-                                    Not verified
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <Badge
+                                    icon={isAdmin ? ShieldCheck : UserRound}
+                                >
+                                    {formatRole(profile.role)}
                                 </Badge>
-                            )}
+
+                                {profile.isVerified ? (
+                                    <Badge icon={BadgeCheck}>
+                                        Verified
+                                    </Badge>
+                                ) : (
+                                    <Badge icon={Clock} tone="muted">
+                                        Not verified
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
                     </div>
+
+                    {/* Edit profile */}
+                    {isOwnProfile && (
+                        <button
+                            type="button"
+                            onClick={() => setEditOpen(true)}
+                            className={`${secondaryButtonClass} self-start sm:shrink-0`}
+                        >
+                            <Pencil size={15} />
+                            Edit profile
+                        </button>
+                    )}
                 </div>
             </section>
 
-            {/* Details */}
+            {/* Account details */}
             <section aria-labelledby="profile-details-heading">
                 <h3
                     id="profile-details-heading"
-                    className={`mb-2 px-1 ${sectionLabelClass}`}
+                    className="mb-3 font-semibold text-[var(--text)]"
                 >
                     Account details
                 </h3>
@@ -655,7 +916,9 @@ export default function Profile() {
                     </DetailItem>
 
                     <DetailItem icon={AtSign} label="Username">
-                        {profile.userName ? `@${profile.userName}` : "Not available"}
+                        {profile.userName
+                            ? `@${profile.userName}`
+                            : "Not available"}
                     </DetailItem>
 
                     <DetailItem icon={Mail} label="Email">
@@ -694,12 +957,6 @@ export default function Profile() {
                     </DetailItem>
                 </div>
             </section>
-
-            {!isOwnProfile && (
-                <p className="px-1 text-xs text-[var(--text-subtle)]">
-                    You are viewing another member&apos;s profile.
-                </p>
-            )}
 
             {editOpen && isOwnProfile && (
                 <EditProfileDialog
