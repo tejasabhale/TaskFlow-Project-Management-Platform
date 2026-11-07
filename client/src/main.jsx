@@ -8,16 +8,19 @@ import SmoothScroll from "./components/ui/SmoothScroll.jsx";
 import ScrollToTop from "./components/ui/ScrollToTop.jsx";
 
 import { AuthProvider } from "./context/AuthProvider.jsx";
-import { WorkspaceProvider } from "./context/WorkspaceContext.jsx";
+import { ThemeProvider } from "./context/ThemeProvider.jsx";
+import { WorkspaceProvider } from "./context/WorkspaceProvider.jsx";
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
-    <AuthProvider>
-      <WorkspaceProvider>
-        <SmoothScroll />
-        <ScrollToTop />
-        <App />
-      </WorkspaceProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <WorkspaceProvider>
+          <SmoothScroll />
+          <ScrollToTop />
+          <App />
+        </WorkspaceProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </BrowserRouter>
 );

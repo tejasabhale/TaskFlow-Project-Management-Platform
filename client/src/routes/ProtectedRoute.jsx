@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import Loader from "../components/common/Loader";
 import { useAuth } from "../hooks/useAuth";
@@ -7,20 +7,15 @@ const ProtectedRoute = () => {
     const {
         loading,
         isAuthenticated,
-        user,
     } = useAuth();
+    const location = useLocation();
 
     if (loading) {
         return <Loader />;
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/" replace />;
-    }
-
-    // Admin users should not access the regular dashboard.
-    if (user?.role === "admin") {
-        return <Navigate to="/admin" replace />;
+        return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
     return <Outlet />;

@@ -21,7 +21,11 @@ import {
     X,
 } from "lucide-react";
 
-import api from "../../api/axios";
+import {
+    getProjectById,
+    updateProject,
+    deleteProject,
+} from "../../services/project.service.js";
 import { getTasks } from "../../services/task.service.js";
 
 /* Same loader id as the other pages, so the font is only added once */
@@ -35,7 +39,6 @@ const displayFont = {
 };
 
 /* index.css sets an unlayered color on <a>, so link colors are inline */
-const mutedLinkStyle = { color: "var(--text-muted)" };
 const textLinkStyle = { color: "var(--text)" };
 const primaryLinkStyle = { color: "var(--primary-text)" };
 
@@ -561,7 +564,7 @@ export default function ProjectDetails() {
             setTaskError("");
 
             try {
-                const response = await api.get(`/projects/${resolvedProjectId}`);
+                const response = await getProjectById(resolvedProjectId);
                 const projectData = getEntity(response, "project");
 
                 if (!projectData?._id) {
@@ -667,7 +670,7 @@ export default function ProjectDetails() {
                 endDate: form.endDate || null,
             };
 
-            const response = await api.patch(`/projects/${resolvedProjectId}`, payload);
+            const response = await updateProject(resolvedProjectId, payload);
             const updatedProject = getEntity(response, "project");
 
             setProject((current) => ({
@@ -703,7 +706,7 @@ export default function ProjectDetails() {
         setError("");
 
         try {
-            await api.delete(`/projects/${resolvedProjectId}`);
+            await deleteProject(resolvedProjectId);
 
             navigate("/dashboard/projects", { replace: true });
         } catch (err) {

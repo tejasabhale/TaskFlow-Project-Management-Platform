@@ -16,10 +16,18 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
   } catch (error) {
     throw new ApiError(401, "Invalid or expired access token");
   }
-  const user = await User.findById(decodedToken._id);
+  const user = await User.findById(decodedToken._id)
+    .select("-password -refreshToken -passwordResetToken -passwordResetTokenExpiry")
+    .lean();
+
   if (!user) {
     throw new ApiError(401, "Invalid Access Token");
   }
+
+  if (!user.isVerified) {
+    throw new ApiError(403, "Please verify your account first.");
+  }
+
   req.user = user;
   next();
 });

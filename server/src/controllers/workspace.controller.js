@@ -1,9 +1,16 @@
 import mongoose from "mongoose";
 import { Workspace } from "../models/workspace.model.js";
 import { User } from "../models/user.model.js";
+import { Project } from "../models/project.model.js";
+import { Task } from "../models/task.model.js";
+import { Label } from "../models/label.model.js";
+import { Comment } from "../models/comment.model.js";
+import { Activity } from "../models/activity.model.js";
+import { Notification } from "../models/notification.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { deleteFromCloudinary } from "../utils/cloudinary.js";
 
 const USER_FIELDS = "fullName userName email";
 
@@ -119,7 +126,8 @@ const getWorkspaces = asyncHandler(async (req, res) => {
   })
     .populate("owner", USER_FIELDS)
     .populate("members.user", USER_FIELDS)
-    .sort({ updatedAt: -1 });
+    .sort({ updatedAt: -1 })
+    .lean();
 
   return res
     .status(200)
@@ -197,7 +205,7 @@ const updateWorkspace = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, workspace, "Workspace updated successfully."));
 });
 
-// Delete a workspace (owner only)
+// Delete a workspace (owner only) - cascades to projects, tasks, comments, labels, activities, and attachments
 const deleteWorkspace = asyncHandler(async (req, res) => {
   const userId = getCurrentUserId(req);
 
@@ -210,7 +218,33 @@ const deleteWorkspace = asyncHandler(async (req, res) => {
     );
   }
 
-  await Workspace.deleteOne({ _id: workspace._id });
+  // Find all tasks to delete their attachments from Cloudinary
+  const tasks = await Task.find({ workspace: workspace._id })
+    .select("attachments")
+    .lean();
+
+  for (const task of tasks) {
+    if (Array.isArray(task.attachments)) {
+      for (const att of task.attachments) {
+        if (att.publicId) {
+          deleteFromCloudinary(att.publicId, att.resourceType || "image").catch(
+            () => {},
+          );
+        }
+      }
+    }
+  }
+
+  // Cascade delete all dependent workspace resources
+  await Promise.all([
+    Task.deleteMany({ workspace: workspace._id }),
+    Project.deleteMany({ workspace: workspace._id }),
+    Label.deleteMany({ workspace: workspace._id }),
+    Comment.deleteMany({ workspace: workspace._id }),
+    Activity.deleteMany({ workspace: workspace._id }),
+    Notification.deleteMany({ workspace: workspace._id }),
+    Workspace.deleteOne({ _id: workspace._id }),
+  ]);
 
   return res
     .status(200)
@@ -342,6 +376,27 @@ const updateWorkspaceMemberRole = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, workspace, "Member role updated successfully."));
 });
 
+// Get members of a workspace
+const getWorkspaceMembers = asyncHandler(async (req, res) => {
+  const userId = getCurrentUserId(req);
+
+  const workspace = await getWorkspaceForUser(req.params.workspaceId, userId);
+
+  await workspace.populate("owner", USER_FIELDS);
+  await workspace.populate("members.user", USER_FIELDS);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        owner: workspace.owner,
+        members: workspace.members,
+      },
+      "Workspace members fetched successfully.",
+    ),
+  );
+});
+
 // Remove a member from a workspace
 const removeWorkspaceMember = asyncHandler(async (req, res) => {
   const userId = getCurrentUserId(req);
@@ -376,6 +431,15 @@ const removeWorkspaceMember = asyncHandler(async (req, res) => {
   workspace.members.splice(memberIndex, 1);
 
   await workspace.save();
+
+  // Referential cleanup: unassign any tasks in this workspace assigned to the removed member
+  await Task.updateMany(
+    { workspace: workspace._id, assignedTo: memberId },
+    { $unset: { assignedTo: 1 } },
+  ).catch((err) => {
+    console.error("Unable to unassign tasks for removed member:", err.message);
+  });
+
   await workspace.populate("owner", USER_FIELDS);
   await workspace.populate("members.user", USER_FIELDS);
 
@@ -388,6 +452,7 @@ export {
   createWorkspace,
   getWorkspaces,
   getWorkspaceById,
+  getWorkspaceMembers,
   updateWorkspace,
   deleteWorkspace,
   addWorkspaceMember,

@@ -10,8 +10,9 @@ import {
   UserRound,
 } from "lucide-react";
 
-import { useWorkspace } from "../../context/WorkspaceContext.jsx";
+import { useWorkspace } from "../../hooks/useWorkspace.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import { useTheme } from "../../hooks/useTheme.js";
 import HamburgerButton from "./HamburgerButton.jsx";
 
 const pageTitles = [
@@ -20,23 +21,6 @@ const pageTitles = [
   { path: "/dashboard/members", title: "Members" },
   { path: "/dashboard/profile", title: "My Profile" },
 ];
-
-/* Get saved theme. Default: Light */
-function getInitialTheme() {
-  if (typeof window === "undefined") return "light";
-
-  try {
-    const saved = localStorage.getItem("theme");
-
-    if (saved === "light" || saved === "dark") {
-      return saved;
-    }
-  } catch {
-    // Use light theme if storage is unavailable.
-  }
-
-  return "light";
-}
 
 const getInitials = (name = "") =>
   name
@@ -71,6 +55,7 @@ export default function AppTopbar({ sidebarOpen, onToggleSidebar }) {
 
   const { user, logout } = useAuth();
   const { currentWorkspace, loading: workspaceLoading } = useWorkspace();
+  const { isDark: isDarkMode, toggleTheme } = useTheme();
 
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
@@ -78,30 +63,6 @@ export default function AppTopbar({ sidebarOpen, onToggleSidebar }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
-
-  /* Theme state */
-  const [theme, setTheme] = useState(getInitialTheme);
-
-  const isDarkMode = theme === "dark";
-
-  /* Apply theme and save preference */
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", isDarkMode);
-    document.documentElement.style.colorScheme = theme;
-
-    try {
-      localStorage.setItem("theme", theme);
-    } catch {
-      // Keep selected theme for the current session.
-    }
-  }, [theme, isDarkMode]);
-
-  /* Toggle theme */
-  const toggleTheme = () => {
-    setTheme((current) =>
-      current === "dark" ? "light" : "dark"
-    );
-  };
 
   const pageTitle =
     pageTitles.find(({ path }) =>

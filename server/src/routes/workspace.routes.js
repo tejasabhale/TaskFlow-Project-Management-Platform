@@ -4,6 +4,7 @@ import {
   createWorkspace,
   getWorkspaces,
   getWorkspaceById,
+  getWorkspaceMembers,
   updateWorkspace,
   deleteWorkspace,
   addWorkspaceMember,
@@ -26,6 +27,7 @@ router.patch("/:workspaceId", updateWorkspace);
 router.delete("/:workspaceId", deleteWorkspace);
 
 // Workspace members
+router.get("/:workspaceId/members", getWorkspaceMembers);
 router.post("/:workspaceId/members", addWorkspaceMember);
 router.patch("/:workspaceId/members/:memberId/role", updateWorkspaceMemberRole);
 router.delete("/:workspaceId/members/:memberId", removeWorkspaceMember);

@@ -11,7 +11,14 @@ export const getWorkspaces = async () => {
 };
 
 export const getWorkspaceById = async (workspaceId) => {
-  const response = await api.get(`/workspaces/${workspaceId}`);
+  const response = await api.get(`/workspaces/${encodeURIComponent(workspaceId)}`);
+  return response.data;
+};
+
+export const getWorkspaceMembers = async (workspaceId) => {
+  const response = await api.get(
+    `/workspaces/${encodeURIComponent(workspaceId)}/members`,
+  );
   return response.data;
 };
 
@@ -28,13 +35,18 @@ export const deleteWorkspace = async (workspaceId) => {
 
 export const addWorkspaceMember = async (
   workspaceId,
-  memberId,
+  emailOrPayload,
   role = "member",
 ) => {
-  const response = await api.post(`/workspaces/${workspaceId}/members`, {
-    memberId,
-    role,
-  });
+  const payload =
+    typeof emailOrPayload === "object" && emailOrPayload !== null
+      ? emailOrPayload
+      : { email: emailOrPayload, role };
+
+  const response = await api.post(
+    `/workspaces/${encodeURIComponent(workspaceId)}/members`,
+    payload,
+  );
 
   return response.data;
 };

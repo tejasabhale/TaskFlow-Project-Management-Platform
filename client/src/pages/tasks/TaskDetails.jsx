@@ -22,7 +22,17 @@ import {
     X,
 } from "lucide-react";
 
-import api from "../../api/axios";
+import {
+    getTaskById,
+    updateTask,
+    deleteTask,
+    uploadTaskAttachment,
+    deleteTaskAttachment,
+} from "../../services/task.service.js";
+import {
+    getWorkspaceById,
+    getWorkspaceMembers,
+} from "../../services/workspace.service.js";
 
 /* Same loader id as Login / Register / Overview / Tasks, so the font is only added once */
 const DISPLAY_FONT_ID = "login-display-font";
@@ -462,7 +472,7 @@ export default function TaskDetails() {
             setError("");
 
             try {
-                const response = await api.get(`/tasks/${currentTaskId}`);
+                const response = await getTaskById(currentTaskId);
                 const taskData = normalizeTask(response);
 
                 if (!taskData?._id) {
@@ -477,8 +487,8 @@ export default function TaskDetails() {
 
                 if (workspaceId) {
                     const [membersResult, workspaceResult] = await Promise.allSettled([
-                        api.get(`/workspaces/${encodeURIComponent(workspaceId)}/members`),
-                        api.get(`/workspaces/${encodeURIComponent(workspaceId)}`),
+                        getWorkspaceMembers(workspaceId),
+                        getWorkspaceById(workspaceId),
                     ]);
 
                     if (membersResult.status === "fulfilled") {
@@ -581,7 +591,7 @@ export default function TaskDetails() {
                 payload.assignedTo = form.assignedTo || null;
             }
 
-            await api.patch(`/tasks/${currentTaskId}`, payload);
+            await updateTask(currentTaskId, payload);
 
             setEditing(false);
             await loadTask(true);
@@ -612,11 +622,8 @@ export default function TaskDetails() {
 
         try {
             for (const file of files) {
-                const formData = new FormData();
-                formData.append("file", file);
-
                 try {
-                    await api.post(`/tasks/${currentTaskId}/attachments`, formData);
+                    await uploadTaskAttachment(currentTaskId, file);
                     uploadedCount += 1;
                 } catch (err) {
                     uploadError =
@@ -668,9 +675,7 @@ export default function TaskDetails() {
         setRemovingAttachmentId(String(attachmentId));
 
         try {
-            await api.delete(`/tasks/${currentTaskId}/attachments`, {
-                data: { attachmentId },
-            });
+            await deleteTaskAttachment(currentTaskId, attachmentId);
 
             await loadTask(true);
             setSuccess("Attachment removed.");
@@ -697,7 +702,7 @@ export default function TaskDetails() {
         setSuccess("");
 
         try {
-            await api.delete(`/tasks/${currentTaskId}`);
+            await deleteTask(currentTaskId);
             navigate("/dashboard/tasks", { replace: true });
         } catch (err) {
             setError(

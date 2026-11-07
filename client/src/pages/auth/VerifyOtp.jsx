@@ -1,389 +1,388 @@
-
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-    ArrowRight,
-    CheckCircle2,
-    CheckSquare,
-    Mail,
-    RefreshCw,
-    ShieldCheck,
-} from "lucide-react";
-import {
-    verifyOtp as verifyEmailOtp,
-    resendOtp,
-} from "../../services/auth.service.js";
+import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 
-const inputClass =
-    "mt-2 w-full rounded-lg border px-3.5 py-3 text-sm " +
-    "outline-none transition-colors focus-visible:outline-2 " +
-    "focus-visible:outline-[var(--focus)] placeholder:text-[var(--text-muted)]";
+import {
+    resendOtp as resendOtpRequest,
+    verifyOtp as verifyOtpRequest,
+} from "../../services/auth.service.js";
+import AuthLayout, {
+    AuthBanner,
+    accentLinkStyle,
+    primaryButtonClass,
+    primaryButtonStyle,
+} from "./AuthLayout";
+
+const OTP_LENGTH = 6;
+const RESEND_COOLDOWN = 60; // seconds, matches the API cooldown
+const EMPTY_CODE = Array(OTP_LENGTH).fill("");
+
+const otpBoxClass =
+    "h-14 w-full min-w-0 rounded-xl border text-center text-2xl font-bold tabular-nums " +
+    "bg-[var(--background)] text-[var(--text)] border-[var(--border)] " +
+    "hover:border-[var(--border-strong)] " +
+    "disabled:cursor-not-allowed disabled:opacity-60";
 
 export default function VerifyOtp() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const [email, setEmail] = useState(
-        location.state?.email || ""
-    );
-    const [otp, setOtp] = useState("");
+    /* Register and Login both pass the email through router state */
+    const email = location.state?.email || "";
+
+    const [digits, setDigits] = useState(EMPTY_CODE);
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
+    const [verified, setVerified] = useState(false);
+    const [cooldown, setCooldown] = useState(RESEND_COOLDOWN);
     const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
-    const [cooldown, setCooldown] = useState(0);
+    const [notice, setNotice] = useState("");
 
+    const inputsRef = useRef([]);
+
+    /* Nothing to verify without an email: send people back to sign in */
+    useEffect(() => {
+        if (!email) navigate("/login", { replace: true });
+    }, [email, navigate]);
+
+    /* Resend countdown */
     useEffect(() => {
         if (cooldown <= 0) return;
-
-        const timer = window.setTimeout(() => {
-            setCooldown((current) => Math.max(0, current - 1));
-        }, 1000);
-
-        return () => window.clearTimeout(timer);
+        const id = setTimeout(() => setCooldown((current) => current - 1), 1000);
+        return () => clearTimeout(id);
     }, [cooldown]);
 
-    const handleOtpChange = (event) => {
-        const value = event.target.value.replace(/\D/g, "").slice(0, 6);
-        setOtp(value);
+    /* Continue into the app after a successful verification */
+    useEffect(() => {
+        if (!verified) return;
+
+        // verify-otp signs the user in (cookies are set by the API). A full
+        // load lets AuthProvider restore the session from /auth/session.
+        const id = setTimeout(() => {
+            window.location.replace("/dashboard");
+        }, 1400);
+
+        return () => clearTimeout(id);
+    }, [verified]);
+
+    const focusInput = (index) => {
+        const input = inputsRef.current[index];
+        if (input) {
+            input.focus();
+            input.select();
+        }
     };
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
+    const clearMessages = () => {
+        if (error) setError("");
+        if (notice) setNotice("");
+    };
+
+    const submit = async (code) => {
+        if (loading || verified) return;
+
         setError("");
-        setMessage("");
+        setNotice("");
 
-        const normalizedEmail = email.trim().toLowerCase();
-
-        if (!normalizedEmail) {
-            setError("Please enter your email address.");
-            return;
-        }
-
-        if (!/^\d{6}$/.test(otp)) {
-            setError("Please enter the complete 6-digit OTP.");
+        if (code.length !== OTP_LENGTH) {
+            setError(`Enter the ${OTP_LENGTH}-digit code from your email.`);
             return;
         }
 
         try {
             setLoading(true);
 
-            await verifyEmailOtp(normalizedEmail, otp);
+            await verifyOtpRequest(email, code);
 
-            navigate("/", { replace: true });
+            setVerified(true);
         } catch (err) {
-            setError(
-                err.response?.data?.message ||
-                err.message ||
-                "OTP verification failed. Please try again."
-            );
+            setDigits(EMPTY_CODE);
+
+            if (!err.response) {
+                setError("Can't reach the server. Check your connection and try again.");
+            } else {
+                const apiMessage =
+                    err.response?.data?.message ||
+                    "We couldn't verify that code. Please try again.";
+
+                const needsNewCode =
+                    err.response.status === 429 || /expired|no otp/i.test(apiMessage);
+
+                setError(
+                    needsNewCode ? `${apiMessage} Request a new code below.` : apiMessage
+                );
+            }
+
+            // Wait for the inputs to re-enable before moving focus.
+            setTimeout(() => focusInput(0), 0);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleResendOtp = async () => {
-        setError("");
-        setMessage("");
+    const handleChange = (index, event) => {
+        const value = event.target.value.replace(/\D/g, "");
 
-        const normalizedEmail = email.trim().toLowerCase();
+        clearMessages();
 
-        if (!normalizedEmail) {
-            setError("Please enter your email address.");
+        if (!value) {
+            setDigits((current) => {
+                const next = [...current];
+                next[index] = "";
+                return next;
+            });
             return;
         }
+
+        const next = [...digits];
+        next[index] = value.slice(-1);
+        setDigits(next);
+
+        if (index < OTP_LENGTH - 1) {
+            focusInput(index + 1);
+        }
+
+        if (next.every(Boolean)) {
+            submit(next.join(""));
+        }
+    };
+
+    const handleKeyDown = (index, event) => {
+        if (event.key === "Backspace" && !digits[index] && index > 0) {
+            event.preventDefault();
+
+            setDigits((current) => {
+                const next = [...current];
+                next[index - 1] = "";
+                return next;
+            });
+
+            focusInput(index - 1);
+        }
+
+        if (event.key === "ArrowLeft" && index > 0) {
+            event.preventDefault();
+            focusInput(index - 1);
+        }
+
+        if (event.key === "ArrowRight" && index < OTP_LENGTH - 1) {
+            event.preventDefault();
+            focusInput(index + 1);
+        }
+    };
+
+    const handlePaste = (event) => {
+        const pasted = event.clipboardData
+            .getData("text")
+            .replace(/\D/g, "")
+            .slice(0, OTP_LENGTH);
+
+        if (!pasted) return;
+
+        event.preventDefault();
+        clearMessages();
+
+        const next = [...EMPTY_CODE];
+        pasted.split("").forEach((char, i) => {
+            next[i] = char;
+        });
+        setDigits(next);
+
+        if (pasted.length === OTP_LENGTH) {
+            submit(pasted);
+        } else {
+            focusInput(pasted.length);
+        }
+    };
+
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        submit(digits.join(""));
+    };
+
+    const handleResend = async () => {
+        if (resending || loading || cooldown > 0) return;
+
+        setError("");
+        setNotice("");
 
         try {
             setResending(true);
 
-            await resendOtp(normalizedEmail);
+            await resendOtpRequest(email);
 
-            setOtp("");
-            setCooldown(60);
-            setMessage("A new verification code has been sent to your email.");
+            setDigits(EMPTY_CODE);
+            setCooldown(RESEND_COOLDOWN);
+            setNotice("We sent you a new code. The previous one no longer works.");
+            focusInput(0);
         } catch (err) {
-            const status = err.response?.status;
-            const responseMessage = err.response?.data?.message;
+            if (!err.response) {
+                setError("Can't reach the server. Check your connection and try again.");
+            } else {
+                // Keep the countdown in sync when the API says to wait.
+                if (err.response.status === 429) setCooldown(RESEND_COOLDOWN);
 
-            if (status === 429) {
-                setCooldown(60);
+                setError(
+                    err.response?.data?.message ||
+                    "We couldn't send a new code. Please try again."
+                );
             }
-
-            setError(
-                responseMessage ||
-                err.message ||
-                "Unable to resend the OTP. Please try again."
-            );
         } finally {
             setResending(false);
         }
     };
 
-    return (
-        <main
-            className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-10 sm:px-6"
-            style={{
-                backgroundColor: "var(--bg, #f7faf9)",
-                color: "var(--text)",
-            }}
-        >
-            <div
-                className="grid w-full max-w-5xl overflow-hidden rounded-2xl border lg:grid-cols-2"
-                style={{
-                    backgroundColor: "var(--surface)",
-                    borderColor: "var(--border)",
-                }}
+    if (!email) return null;
+
+    const busy = loading || resending;
+    const code = digits.join("");
+
+    /* ---------- Confirmation ---------- */
+    if (verified) {
+        return (
+            <AuthLayout
+                stateKey="done"
+                icon={<Check size={24} strokeWidth={3} />}
+                iconTone="success"
+                title="Email verified"
+                subtitle="You're signed in. Taking you to your dashboard..."
             >
-                {/* Welcome Panel */}
-                <aside
-                    className="hidden flex-col justify-between border-r p-10 lg:flex xl:p-12"
-                    style={{
-                        backgroundColor: "var(--surface-muted)",
-                        borderColor: "var(--border)",
-                    }}
-                >
-                    <div>
-                        <div
-                            className="mb-10 inline-flex h-12 w-12 items-center justify-center rounded-xl"
-                            style={{
-                                backgroundColor: "var(--primary-soft, #e1f2ef)",
-                                color: "var(--primary)",
-                            }}
-                        >
-                            <ShieldCheck size={25} strokeWidth={1.8} />
-                        </div>
+                <p role="status" className="sr-only">
+                    Email verified. Redirecting to your dashboard.
+                </p>
+            </AuthLayout>
+        );
+    }
 
-                        <p
-                            className="text-xs font-semibold uppercase tracking-[0.18em]"
-                            style={{ color: "var(--primary)" }}
-                        >
-                            Account security
-                        </p>
+    /* ---------- Form ---------- */
+    return (
+        <AuthLayout
+            stateKey="form"
+            icon={<ShieldCheck size={22} />}
+            title="Verify your email"
+            subtitle={
+                <>
+                    Enter the 6-digit code we sent to{" "}
+                    <span className="break-all font-semibold text-[var(--text)]">{email}</span>
+                    . It expires in 5 minutes.
+                </>
+            }
+            error={error}
+            footer={
+                <>
+                    Wrong email?{" "}
+                    <Link
+                        to="/register"
+                        className="font-semibold hover:underline"
+                        style={accentLinkStyle}
+                    >
+                        Create a new account
+                    </Link>
+                </>
+            }
+        >
+            <AuthBanner
+                id="otp-message"
+                text={error || notice}
+                variant={error ? "error" : "info"}
+            />
 
-                        <h1 className="mt-4 max-w-sm text-4xl font-semibold leading-tight tracking-tight">
-                            One small step to get started.
-                        </h1>
+            <form
+                onSubmit={handleSubmit}
+                noValidate
+                aria-busy={loading}
+                className="mt-8 space-y-5"
+            >
+                <div data-reveal>
+                    <label
+                        htmlFor="otp-0"
+                        id="otp-label"
+                        className="text-sm font-semibold"
+                    >
+                        Verification code
+                    </label>
 
-                        <p
-                            className="mt-5 max-w-sm text-sm leading-7"
-                            style={{ color: "var(--text-muted)" }}
-                        >
-                            Verify your email address to secure your account and get started
-                            with your tasks and projects.
-                        </p>
-                    </div>
-
-                    <div className="mt-12 space-y-4">
-                        {[
-                            "Verify your email address",
-                            "Protect access to your account",
-                            "Get started with TaskFlow",
-                        ].map((item) => (
-                            <div key={item} className="flex items-center gap-3">
-                                <CheckCircle2
-                                    size={18}
-                                    strokeWidth={1.8}
-                                    style={{ color: "var(--primary)" }}
-                                />
-
-                                <span
-                                    className="text-sm"
-                                    style={{ color: "var(--text-muted)" }}
-                                >
-                                    {item}
-                                </span>
-                            </div>
+                    <div
+                        role="group"
+                        aria-labelledby="otp-label"
+                        className="mt-2 grid grid-cols-6 gap-2 sm:gap-2.5"
+                    >
+                        {digits.map((digit, i) => (
+                            <input
+                                key={i}
+                                id={`otp-${i}`}
+                                ref={(node) => {
+                                    inputsRef.current[i] = node;
+                                }}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                autoComplete={i === 0 ? "one-time-code" : "off"}
+                                maxLength={1}
+                                autoFocus={i === 0}
+                                value={digit}
+                                onChange={(event) => handleChange(i, event)}
+                                onKeyDown={(event) => handleKeyDown(i, event)}
+                                onPaste={handlePaste}
+                                onFocus={(event) => event.target.select()}
+                                disabled={busy}
+                                aria-label={`Digit ${i + 1} of ${OTP_LENGTH}`}
+                                aria-invalid={Boolean(error)}
+                                aria-describedby={error ? "otp-message" : undefined}
+                                className={otpBoxClass}
+                            />
                         ))}
                     </div>
+                </div>
 
-                    <p
-                        className="mt-12 text-xs"
-                        style={{ color: "var(--text-muted)" }}
+                <div data-reveal>
+                    <button
+                        type="submit"
+                        disabled={busy || code.length !== OTP_LENGTH}
+                        className={primaryButtonClass}
+                        style={primaryButtonStyle}
                     >
-                        Your work starts here.
-                    </p>
-                </aside>
-
-                {/* OTP Verification Form */}
-                <section className="flex items-center p-6 sm:p-10 xl:p-12">
-                    <div className="mx-auto w-full max-w-md">
-                        <div
-                            className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl"
-                            style={{
-                                backgroundColor: "var(--primary-soft, #e1f2ef)",
-                                color: "var(--primary)",
-                            }}
-                        >
-                            <Mail size={24} strokeWidth={1.8} />
-                        </div>
-
-                        <p
-                            className="text-xs font-semibold uppercase tracking-[0.16em]"
-                            style={{ color: "var(--primary)" }}
-                        >
-                            Email verification
-                        </p>
-
-                        <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-                            Verify your email
-                        </h2>
-
-                        <p
-                            className="mt-3 text-sm leading-6"
-                            style={{ color: "var(--text-muted)" }}
-                        >
-                            Enter the 6-digit verification code sent to your email address.
-                            The code expires after 5 minutes.
-                        </p>
-
-                        {error && (
-                            <div
-                                role="alert"
-                                className="mt-6 rounded-lg border px-4 py-3 text-sm leading-5"
-                                style={{
-                                    borderColor: "#dc7777",
-                                    color: "#c24141",
-                                    backgroundColor: "var(--surface)",
-                                }}
-                            >
-                                {error}
-                            </div>
-                        )}
-
-                        {message && (
-                            <div
-                                role="status"
-                                className="mt-6 rounded-lg border px-4 py-3 text-sm leading-5"
-                                style={{
-                                    borderColor: "var(--primary)",
-                                    color: "var(--primary)",
-                                    backgroundColor: "var(--surface)",
-                                }}
-                            >
-                                {message}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit} className="mt-7 space-y-5">
-                            <div>
-                                <label
-                                    htmlFor="verify-email"
-                                    className="text-sm font-medium"
-                                >
-                                    Email address
-                                </label>
-
-                                <input
-                                    id="verify-email"
-                                    type="email"
-                                    autoComplete="email"
-                                    placeholder="you@example.com"
-                                    value={email}
-                                    onChange={(event) => setEmail(event.target.value)}
-                                    className={inputClass}
-                                    style={{
-                                        backgroundColor: "var(--surface)",
-                                        color: "var(--text)",
-                                        borderColor: "var(--border)",
-                                    }}
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label
-                                    htmlFor="verify-otp"
-                                    className="text-sm font-medium"
-                                >
-                                    Verification code
-                                </label>
-
-                                <input
-                                    id="verify-otp"
-                                    name="otp"
-                                    type="text"
-                                    inputMode="numeric"
-                                    autoComplete="one-time-code"
-                                    pattern="[0-9]{6}"
-                                    maxLength={6}
-                                    placeholder="Enter 6-digit code"
-                                    value={otp}
-                                    onChange={handleOtpChange}
-                                    className={`${inputClass} text-center text-xl font-semibold tracking-[0.45em]`}
-                                    style={{
-                                        backgroundColor: "var(--surface)",
-                                        color: "var(--text)",
-                                        borderColor: "var(--border)",
-                                    }}
-                                    required
-                                />
-
-                                <p
-                                    className="mt-2 text-xs"
-                                    style={{ color: "var(--text-muted)" }}
-                                >
-                                    Check your inbox and spam folder for the email.
-                                </p>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={loading || otp.length !== 6}
-                                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                                style={{
-                                    backgroundColor: "var(--primary)",
-                                    color: "#ffffff",
-                                }}
-                            >
-                                {loading ? "Verifying..." : "Verify Email"}
-                                {!loading && <ArrowRight size={17} />}
-                            </button>
-                        </form>
-
-                        <div className="mt-6 text-center">
-                            <p
-                                className="text-sm"
-                                style={{ color: "var(--text-muted)" }}
-                            >
-                                Didn't receive the code?
-                            </p>
-
-                            <button
-                                type="button"
-                                onClick={handleResendOtp}
-                                disabled={resending || cooldown > 0}
-                                className="mt-2 inline-flex items-center gap-2 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                                style={{ color: "var(--primary)" }}
-                            >
-                                <RefreshCw
+                        {loading ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Verifying...
+                            </>
+                        ) : (
+                            <>
+                                Verify email
+                                <ArrowRight
                                     size={15}
-                                    className={resending ? "animate-spin" : ""}
+                                    className="transition-transform duration-200 group-hover:translate-x-1"
                                 />
+                            </>
+                        )}
+                    </button>
+                </div>
+            </form>
 
-                                {resending
-                                    ? "Sending code..."
-                                    : cooldown > 0
-                                        ? `Resend code in ${cooldown}s`
-                                        : "Resend verification code"}
-                            </button>
-                        </div>
+            <div
+                data-reveal
+                className="mt-6 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-sm text-[var(--text-muted)]"
+            >
+                <span>Didn&apos;t get a code?</span>
 
-                        <p
-                            className="mt-7 text-center text-sm"
-                            style={{ color: "var(--text-muted)" }}
-                        >
-                            Already verified?{" "}
-                            <Link
-                                to="/login"
-                                className="font-semibold no-underline hover:underline"
-                                style={{ color: "var(--primary)" }}
-                            >
-                                Sign in
-                            </Link>
-                        </p>
-                    </div>
-                </section>
+                {cooldown > 0 ? (
+                    <span aria-live="polite" className="tabular-nums">
+                        Resend in {cooldown}s
+                    </span>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={handleResend}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                        style={accentLinkStyle}
+                    >
+                        {resending && <Loader2 size={13} className="animate-spin" />}
+                        {resending ? "Sending..." : "Send a new code"}
+                    </button>
+                )}
             </div>
-        </main>
+        </AuthLayout>
     );
 }

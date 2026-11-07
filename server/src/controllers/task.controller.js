@@ -6,6 +6,7 @@ import { Workspace } from "../models/workspace.model.js";
 import { Project } from "../models/project.model.js";
 import { User } from "../models/user.model.js";
 import { Label } from "../models/label.model.js";
+import { Comment } from "../models/comment.model.js";
 
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -340,7 +341,9 @@ const getTasks = asyncHandler(async (req, res) => {
     filter.assignedTo = userId;
   }
 
-  const tasks = await populateTask(Task.find(filter).sort({ createdAt: -1 }));
+  const tasks = await populateTask(
+    Task.find(filter).sort({ createdAt: -1 }),
+  ).lean();
 
   return res
     .status(200)
@@ -530,6 +533,21 @@ const deleteTask = asyncHandler(async (req, res) => {
       "Only workspace owners or admins can delete tasks.",
     );
   }
+
+  // Clean up any Cloudinary attachments
+  if (Array.isArray(task.attachments) && task.attachments.length > 0) {
+    for (const attachment of task.attachments) {
+      if (attachment.publicId) {
+        deleteFromCloudinary(
+          attachment.publicId,
+          attachment.resourceType || "image",
+        ).catch(() => {});
+      }
+    }
+  }
+
+  // Clean up associated comments
+  await Comment.deleteMany({ task: task._id }).catch(() => {});
 
   await Task.deleteOne({ _id: task._id });
 

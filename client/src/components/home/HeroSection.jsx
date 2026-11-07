@@ -1,56 +1,45 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { gsap } from "gsap";
-import {
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  FolderKanban,
-  ListTodo,
-  TrendingUp,
-} from "lucide-react";
+import HeroBoard from "./HeroBoard";
 
-const primaryButtonStyle = {
-  backgroundColor: "var(--primary)",
-  color: "var(--text-inverse)",
-};
-
-const FEATURES = [
-  { name: "Tasks", Icon: ListTodo },
-  { name: "Projects", Icon: FolderKanban },
-  { name: "Planning", Icon: CalendarDays },
-  { name: "Productivity", Icon: TrendingUp },
-];
+/** Headline line that slides up from behind a mask (animated by gsap below). */
+function Line({ children }) {
+  return (
+    <span className="block overflow-hidden pb-[0.1em]">
+      <span data-line className="block">
+        {children}
+      </span>
+    </span>
+  );
+}
 
 export default function HeroSection() {
   const heroRef = useRef(null);
 
-  useEffect(() => {
+  // One page-load sequence: headline lines, then copy and buttons, with the board rising alongside.
+  useLayoutEffect(() => {
     const root = heroRef.current;
-    if (!root) return;
+    if (!root) return undefined;
 
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    if (reduceMotion) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return undefined;
+    }
 
     const ctx = gsap.context(() => {
-      gsap.from(".hero-reveal", {
-        opacity: 0,
-        y: 18,
-        duration: 0.65,
-        stagger: 0.1,
-        ease: "power3.out",
-      });
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
 
-      gsap.to(".hero-glow", {
-        opacity: 0.55,
-        duration: 4,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut",
-      });
+      tl.from("[data-line]", { yPercent: 110, duration: 0.9, stagger: 0.1 })
+        .from(
+          "[data-hero-fade]",
+          { opacity: 0, y: 16, duration: 0.65, stagger: 0.1, clearProps: "all" },
+          "-=0.5"
+        )
+        .from(
+          "[data-hero-board]",
+          { opacity: 0, y: 28, duration: 0.9, clearProps: "all" },
+          0.25
+        );
     }, root);
 
     return () => ctx.revert();
@@ -62,112 +51,66 @@ export default function HeroSection() {
       id="home"
       className="relative isolate flex min-h-[calc(100svh-4rem)] items-center justify-center overflow-hidden border-b border-[var(--border)] bg-[var(--background)] text-[var(--text)]"
     >
-      {/* Background pattern */}
+      {/* faint dot grid, fades out toward the edges */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          backgroundImage: `
-            radial-gradient(
-              color-mix(in srgb, var(--text-subtle) 35%, transparent) 0.7px,
-              transparent 0.9px
-            ),
-            repeating-linear-gradient(
-              90deg,
-              transparent 0px,
-              transparent 31px,
-              color-mix(in srgb, var(--border) 28%, transparent) 32px
-            )
-          `,
-          backgroundSize: "37px 37px, 32px 100%",
-          maskImage:
-            "radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 100%)",
-          WebkitMaskImage:
-            "radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 100%)",
-          opacity: 0.4,
-        }}
+        className="pointer-events-none absolute inset-0 z-0 opacity-70 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_at_40%_50%,black,transparent_70%)]"
       />
 
-      {/* Background glow */}
-      <div
-        aria-hidden="true"
-        className="hero-glow pointer-events-none absolute inset-0 z-0 opacity-40"
-        style={{
-          background:
-            "radial-gradient(ellipse 60% 50% at 50% 50%, color-mix(in srgb, var(--primary) 15%, transparent), transparent 70%)",
-        }}
-      />
+      {/* two fixed-width columns, centred as a pair with a tight gap; spare room goes to the left/right edges */}
+      <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 sm:py-12 lg:grid-cols-[minmax(0,34rem)_minmax(0,28rem)] lg:justify-center lg:gap-10 lg:px-12 lg:py-8">
+        <div>
+          <h1 className="max-w-3xl font-['Plus_Jakarta_Sans',sans-serif] text-[40px] font-extrabold leading-[1.05] tracking-[-0.055em] sm:text-5xl lg:text-6xl">
+            <Line>Plan less.</Line>
+            <Line>Achieve more.</Line>
+          </h1>
 
-      {/* Hero content — single centered column, uniform spacing */}
-      <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center gap-7 px-5 py-16 text-center sm:gap-8 sm:px-8 sm:py-20">
-        {/* Headline */}
-        <h1 className="hero-reveal max-w-5xl font-['Plus_Jakarta_Sans',sans-serif] text-[44px] font-extrabold leading-[1.04] tracking-[-0.065em] sm:text-6xl md:text-7xl lg:text-[84px]">
-          Plan Less.
-          <br />
-          <span className="font-['Instrument_Serif',serif] font-normal italic tracking-[-0.025em] text-[var(--primary)]">
-            Achieve More.
-          </span>
-        </h1>
-
-        {/* Description */}
-        <p className="hero-reveal max-w-2xl text-sm font-normal leading-7 text-[var(--text-muted)] sm:text-base sm:leading-8 md:text-lg">
-          Organize your tasks, manage your projects, and keep your priorities in
-          focus. TaskFlow brings everything together so you can spend less time
-          planning and more time making progress.
-        </p>
-
-        {/* CTA buttons */}
-        <div className="hero-reveal relative z-20 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
-          <Link
-            to="/register"
-            className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-sm border border-transparent px-7 py-3 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
-            style={primaryButtonStyle}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.backgroundColor =
-                "var(--primary-hover)";
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.backgroundColor = "var(--primary)";
-            }}
+          <p
+            data-hero-fade
+            className="mt-6 max-w-lg text-base leading-7 text-[var(--text-muted)] sm:text-lg sm:leading-8"
           >
-            Get Started Free
-            <ArrowRight
-              size={16}
-              className="transition-transform duration-200 group-hover:translate-x-1"
-            />
-          </Link>
-
-          <a
-            href="#features"
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm border border-[var(--border-strong)] bg-[var(--surface)] px-7 py-3 text-sm font-semibold transition-colors duration-200 hover:border-[var(--primary)] hover:bg-[var(--surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
-            style={{ color: "var(--text)" }}
-          >
-            Explore Features
-          </a>
-        </div>
-
-        {/* Supporting text */}
-        <div className="hero-reveal flex items-center justify-center gap-2 text-xs font-medium text-[var(--text-subtle)] sm:text-sm">
-          Your tasks. Your projects. One clear view.
-        </div>
-
-        {/* Feature labels */}
-        <div className="hero-reveal flex w-full max-w-2xl flex-col items-center gap-5 border-t border-[var(--border)] pt-7 sm:pt-8">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-subtle)] sm:text-xs">
-            Everything you need to stay on track
+            Organize your tasks, manage your projects, and keep your
+            priorities in focus. TaskFlow brings everything together so
+            you can spend less time planning and more time making
+            progress.
           </p>
 
-          <div className="grid w-full grid-cols-2 justify-items-center gap-x-6 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10">
-            {FEATURES.map(({ name, Icon }) => (
-              <div
-                key={name}
-                className="flex items-center gap-2 text-xs font-medium text-[var(--text-muted)] sm:text-sm"
-              >
-                <Icon size={16} className="text-[var(--primary)]" />
-                {name}
-              </div>
-            ))}
+          <div
+            data-hero-fade
+            className="relative z-20 mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
+          >
+            <Link
+              to="/register"
+              className="group relative inline-flex min-h-12 items-center justify-center overflow-hidden rounded-xl border border-[var(--primary)] bg-[var(--primary)] px-7 py-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
+            >
+              {/* black fill slides up from the bottom on hover */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 translate-y-full bg-black transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-y-0 motion-reduce:transition-none"
+              />
+              <span className="relative z-10 text-white transition-colors duration-300 ease-out group-hover:text-[var(--primary)] motion-reduce:transition-none">
+                Get Started Free
+              </span>
+            </Link>
+
+            <a
+              href="#features"
+              className="group relative inline-flex min-h-12 items-center justify-center overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-7 py-3 text-sm font-bold transition-colors duration-300 hover:border-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)] motion-reduce:transition-none"
+            >
+              {/* orange fill slides down from the top on hover (opposite of the primary button) */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 -translate-y-full bg-[var(--primary)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-y-0 motion-reduce:transition-none"
+              />
+              <span className="relative z-10 text-[var(--text)] transition-colors duration-300 ease-out group-hover:text-black motion-reduce:transition-none">
+                Explore Features
+              </span>
+            </a>
           </div>
+        </div>
+
+        <div className="flex justify-center">
+          <HeroBoard />
         </div>
       </div>
     </section>

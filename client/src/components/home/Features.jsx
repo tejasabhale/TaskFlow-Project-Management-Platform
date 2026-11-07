@@ -2,15 +2,12 @@ import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
-  ArrowUpRight,
-  CheckCircle2,
   FolderKanban,
   CalendarClock,
   ChartNoAxesCombined,
   ListTodo,
   SlidersHorizontal,
   Target,
-  Zap,
 } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -138,19 +135,6 @@ export default function Features() {
             overwrite: true,
           }),
       });
-
-      /* Closing statement */
-      gsap.from(".features-closing", {
-        opacity: 0,
-        y: 20,
-        duration: 0.55,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: ".features-closing",
-          start: "top 92%",
-          once: true,
-        },
-      });
     });
 
     return () => mm.revert();
@@ -201,27 +185,13 @@ export default function Features() {
       <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-12">
         {/* Section heading — centered column */}
         <div className="features-header mx-auto flex max-w-3xl flex-col items-center gap-5 pb-10 text-center sm:pb-12">
-          <div className="features-reveal flex items-center gap-3">
-            <span className="h-1.5 w-1.5 shrink-0 bg-[var(--primary)]" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--text-subtle)] sm:text-[11px]">
-              Features
-            </span>
-          </div>
-
-          <div className="features-reveal inline-flex items-center gap-2 border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-            <Zap size={13} className="text-[var(--primary)]" />
-            Built for better work
-          </div>
-
           <h2
             id="features-heading"
-            className="features-reveal font-['Plus_Jakarta_Sans',sans-serif] text-3xl font-bold leading-[1.1] tracking-[-0.045em] sm:text-4xl md:text-5xl"
+            className="features-reveal font-['Plus_Jakarta_Sans',sans-serif] text-3xl font-extrabold leading-[1.1] tracking-[-0.045em] sm:text-4xl md:text-5xl"
           >
             Everything you need.
             <br className="hidden sm:block" />{" "}
-            <span className="font-['Instrument_Serif',serif] font-normal italic tracking-[-0.015em] text-[var(--primary)]">
-              Nothing you don&apos;t.
-            </span>
+            <span className="text-[var(--primary)]">Nothing you don&apos;t.</span>
           </h2>
 
           <p className="features-reveal max-w-xl text-sm leading-7 text-[var(--text-muted)] sm:text-base sm:leading-8">
@@ -230,59 +200,49 @@ export default function Features() {
           </p>
         </div>
 
-        {/* Feature cards — uniform grid, equal heights, centered content */}
-        <div className="grid auto-rows-fr grid-cols-1 gap-0 border-l border-t border-[var(--border)] sm:grid-cols-2 lg:grid-cols-3">
+        {/* Feature cards — no outer container, same bg as the section, equal heights */}
+        <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
           {features.map((feature) => {
             const Icon = feature.icon;
 
             return (
               <article
                 key={feature.number}
-                className="feature-card group relative flex min-w-0 flex-col items-center border-b border-r border-[var(--border)] bg-[var(--surface)] px-5 pb-8 pt-12 text-center transition-colors duration-200 hover:bg-[var(--surface-muted)] sm:px-6 lg:px-7"
+                className="feature-card group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5 transition-[border-color] duration-300 hover:border-[var(--primary)] sm:p-6"
               >
-                {/* Number */}
-                <span className="absolute left-5 top-5 font-mono text-xs tabular-nums text-[var(--text-subtle)]">
-                  / {feature.number}
-                </span>
+                {/* Icon + number */}
+                <div className="mb-6 flex items-start justify-between gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--primary)] transition-colors duration-300 group-hover:border-[var(--primary)] group-hover:bg-[var(--primary)] group-hover:text-white">
+                    <Icon size={22} strokeWidth={1.8} />
+                  </div>
 
-                {/* Corner indicator */}
-                <div className="pointer-events-none absolute right-5 top-5 text-[var(--primary)] opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                  <ArrowUpRight size={16} />
-                </div>
-
-                {/* Icon */}
-                <div className="mb-6 flex h-12 w-12 items-center justify-center border border-[var(--border)] bg-[var(--background)] text-[var(--primary)] transition-colors duration-200 group-hover:border-[var(--primary)] group-hover:bg-[var(--primary)] group-hover:text-[var(--text-inverse)]">
-                  <Icon size={22} strokeWidth={1.7} />
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 font-mono text-[11px] font-semibold tabular-nums text-[var(--text-muted)] transition-colors duration-300 group-hover:border-transparent group-hover:bg-[var(--primary-soft)] group-hover:text-[var(--primary)]">
+                    {feature.number}
+                  </span>
                 </div>
 
                 {/* Card content */}
-                <div className="flex flex-1 flex-col items-center">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+                <div className="flex flex-1 flex-col items-start">
+                  <span className="mb-3 inline-flex rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
                     {feature.label}
-                  </p>
+                  </span>
 
-                  <h3 className="max-w-sm font-['Plus_Jakarta_Sans',sans-serif] text-lg font-bold leading-snug tracking-[-0.025em] text-[var(--text)] sm:text-xl">
+                  <h3 className="font-['Plus_Jakarta_Sans',sans-serif] text-lg font-extrabold leading-snug tracking-[-0.03em] text-[var(--text)] sm:text-xl">
                     {feature.title}
                   </h3>
 
-                  <p className="mt-3 max-w-xs text-sm leading-7 text-[var(--text-muted)]">
+                  <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
                     {feature.description}
                   </p>
                 </div>
 
-                {/* Bottom accent */}
-                <div className="absolute bottom-0 left-0 h-px w-0 bg-[var(--primary)] transition-[width] duration-300 ease-out group-hover:w-full" />
+                {/* Bottom accent, fills like the board's progress bar */}
+                <div className="mt-6 h-1 overflow-hidden rounded-full bg-[var(--border)]">
+                  <div className="h-full w-0 rounded-full bg-[var(--primary)] transition-[width] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:w-full motion-reduce:transition-none" />
+                </div>
               </article>
             );
           })}
-        </div>
-
-        {/* Closing statement — centered */}
-        <div className="features-closing mt-10 flex flex-col items-center justify-center gap-3 text-center sm:flex-row sm:gap-3">
-
-          <p className="text-sm font-medium leading-6 text-[var(--text-muted)]">
-            Less time managing tasks. More time making progress.
-          </p>
         </div>
       </div>
     </section>

@@ -69,6 +69,12 @@ export function AuthProvider({ children }) {
         }
     }, []);
 
+    // Update authenticated user in memory without a full network roundtrip
+    const updateUser = useCallback((updatedUserData) => {
+        if (!updatedUserData) return;
+        setUser((previous) => (previous ? { ...previous, ...updatedUserData } : updatedUserData));
+    }, []);
+
     const value = useMemo(
         () => ({
             user,
@@ -77,8 +83,9 @@ export function AuthProvider({ children }) {
             login,
             logout,
             refreshSession,
+            updateUser,
         }),
-        [user, loading, login, logout, refreshSession]
+        [user, loading, login, logout, refreshSession, updateUser]
     );
 
     return (

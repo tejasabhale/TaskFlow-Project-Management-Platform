@@ -7,6 +7,46 @@ export const errorHandler = (err, req, res, next) => {
     err = new ApiError(400, "File size should not exceed 5 MB.");
   }
 
+  // Handle malformed JSON body
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, null, "Malformed JSON in request body."));
+  }
+
+  // Handle Mongoose CastError (e.g. invalid ObjectId)
+  if (err.name === "CastError") {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          null,
+          `Invalid format for ${err.path || "identifier"}.`,
+        ),
+      );
+  }
+
+  // Handle JWT errors
+  if (err.name === "JsonWebTokenError") {
+    return res
+      .status(401)
+      .json(new ApiResponse(401, null, "Invalid authentication token."));
+  }
+
+  if (err.name === "TokenExpiredError") {
+    return res
+      .status(401)
+      .json(new ApiResponse(401, null, "Authentication token has expired."));
+  }
+
+  // Handle CORS errors
+  if (err.message && err.message.includes("CORS")) {
+    return res
+      .status(403)
+      .json(new ApiResponse(403, null, "Access denied by CORS policy."));
+  }
+
   // Mongoose validation errors
   if (err.name === "ValidationError") {
     return res.status(400).json(

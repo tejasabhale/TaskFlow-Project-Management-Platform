@@ -83,13 +83,12 @@ const taskSchema = new Schema(
     timestamps: true,
   },
 );
-taskSchema.index({ project: 1 });
-taskSchema.index({ assignedTo: 1 });
-
 taskSchema.index({ project: 1, status: 1 });
 taskSchema.index({ project: 1, dueDate: 1 });
 taskSchema.index({ assignedTo: 1, status: 1 });
-taskSchema.index({ workspace: 1, assignedTo: 1 });
-taskSchema.index({ workspace: 1, project: 1 });
+taskSchema.index({ workspace: 1, createdAt: -1 });
+taskSchema.index({ workspace: 1, status: 1, createdAt: -1 });
+taskSchema.index({ workspace: 1, assignedTo: 1, createdAt: -1 });
+taskSchema.index({ workspace: 1, project: 1, createdAt: -1 });
 
 export const Task = mongoose.model("Task", taskSchema);

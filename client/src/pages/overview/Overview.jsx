@@ -21,7 +21,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-import { useWorkspace } from "../../context/WorkspaceContext.jsx";
+import { useWorkspace } from "../../hooks/useWorkspace.js";
 import { getProjects } from "../../services/project.service.js";
 import { getTasks } from "../../services/task.service.js";
 

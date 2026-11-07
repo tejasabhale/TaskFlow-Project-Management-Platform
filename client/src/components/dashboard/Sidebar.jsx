@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useWorkspace } from "../../context/WorkspaceContext.jsx";
+import { useWorkspace } from "../../hooks/useWorkspace.js";
 import { createWorkspace } from "../../services/workspace.service.js";
 import { useAuth } from "../../hooks/useAuth.js";
 

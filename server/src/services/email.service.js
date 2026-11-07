@@ -10,7 +10,7 @@ export const sendOtpEmail = async ({ to, otp }) => {
     await transporter.sendMail({
       from: FROM,
       to,
-      subject: "Verify Your Project Jhep Account",
+      subject: "Verify Your TaskFlow Account",
       html: otpTemplate(otp),
     });
   } catch (error) {
@@ -38,7 +38,7 @@ export const sendPasswordResetEmail = async ({ to, resetLink }) => {
     await transporter.sendMail({
       from: FROM,
       to,
-      subject: "Reset Your Project Jhep Password",
+      subject: "Reset Your TaskFlow Password",
       html: passwordResetTemplate(resetLink),
     });
   } catch (error) {

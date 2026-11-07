@@ -1,4 +1,3 @@
-
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { gsap } from "gsap";
@@ -12,11 +11,27 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../../hooks/useAuth.js";
+import { useTheme } from "../../hooks/useTheme.js";
+
+/* Scroll to the top using Lenis when available, otherwise native scrolling */
+const scrollToTop = ({ smooth = false } = {}) => {
+  if (window.lenis) {
+    window.lenis.scrollTo(0, { immediate: !smooth });
+    return;
+  }
+
+  window.scrollTo({
+    top: 0,
+    left: 0,
+    behavior: smooth ? "smooth" : "instant",
+  });
+};
 
 const NAV_LINKS = [
   { label: "Home", to: "/" },
-  { label: "Features", to: "/features" },
   { label: "About", to: "/about" },
+  { label: "Pricing", to: "/pricing" },
+  { label: "FAQ", to: "/faq" },
   { label: "Contact", to: "/contact" },
 ];
 
@@ -36,25 +51,9 @@ const bigLinkColor = ({ isActive }) => ({
   color: isActive ? "var(--primary-text)" : "var(--text)",
 });
 
-function getInitialTheme() {
-  if (typeof window === "undefined") return "light";
-
-  try {
-    const saved = localStorage.getItem("theme");
-
-    if (saved === "light" || saved === "dark") return saved;
-  } catch {
-    // Storage may be unavailable in private browsing modes.
-  }
-
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
-
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [theme, setTheme] = useState(getInitialTheme);
+  const { isDark, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
 
   const overlayRef = useRef(null);
@@ -75,17 +74,6 @@ const Navbar = () => {
 
   const isAdmin = user?.role === "admin";
   const dashboardPath = isAdmin ? "/admin" : "/dashboard";
-
-  /* Apply theme to <html> and persist it */
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-
-    try {
-      localStorage.setItem("theme", theme);
-    } catch {
-      // Keep the selected theme for this session if storage is unavailable.
-    }
-  }, [theme]);
 
   /* Close the menu on route change */
   useEffect(() => {
@@ -242,12 +230,20 @@ const Navbar = () => {
     }
   }, [menuOpen]);
 
-  const toggleTheme = () =>
-    setTheme((current) =>
-      current === "dark" ? "light" : "dark"
-    );
-
   const closeMenu = () => setMenuOpen(false);
+
+  /*
+   * Nav link click: close the mobile menu and scroll to the top.
+   * - Different page: ScrollToTop jumps to the top when the route changes.
+   * - Same page: the route does not change, so scroll to the top smoothly here.
+   */
+  const handleNavClick = (to) => () => {
+    closeMenu();
+
+    if (location.pathname === to) {
+      scrollToTop({ smooth: true });
+    }
+  };
 
   const handleLogout = async () => {
     closeMenu();
@@ -267,8 +263,8 @@ const Navbar = () => {
     <>
       <header
         className={`sticky top-0 z-50 h-16 w-full border-b backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-500 ${menuOpen
-            ? "border-transparent bg-transparent"
-            : "border-[var(--border)] bg-[var(--surface)]/85"
+          ? "border-transparent bg-transparent"
+          : "border-[var(--border)] bg-[var(--surface)]/85"
           } ${scrolled && !menuOpen
             ? "shadow-[var(--shadow-sm)]"
             : ""
@@ -281,7 +277,7 @@ const Navbar = () => {
           {/* Logo */}
           <Link
             to="/"
-            onClick={closeMenu}
+            onClick={handleNavClick("/")}
             aria-label="TaskFlow home"
             className="flex min-w-0 items-center gap-2.5 justify-self-start"
             style={{ color: "var(--text)" }}
@@ -305,6 +301,7 @@ const Navbar = () => {
                 <NavLink
                   to={link.to}
                   end={link.to === "/"}
+                  onClick={handleNavClick(link.to)}
                   className="rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-[var(--surface-muted)]"
                   style={desktopLinkColor}
                 >
@@ -319,11 +316,10 @@ const Navbar = () => {
             <button
               type="button"
               onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"
-                } theme`}
+              aria-label={`Switch to ${isDark ? "light" : "dark"} theme`}
               className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--surface-muted)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
             >
-              {theme === "dark" ? (
+              {isDark ? (
                 <Sun size={17} />
               ) : (
                 <Moon size={17} />
@@ -393,8 +389,8 @@ const Navbar = () => {
               aria-expanded={menuOpen}
               aria-controls="mobile-menu"
               className={`relative flex h-10 w-10 items-center justify-center rounded-lg border transition-colors duration-500 md:hidden ${menuOpen
-                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary-text)]"
-                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--text)]"
+                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary-text)]"
+                : "border-[var(--border)] bg-[var(--surface)] text-[var(--text)]"
                 }`}
             >
               <span
@@ -448,7 +444,7 @@ const Navbar = () => {
               <NavLink
                 to={link.to}
                 end={link.to === "/"}
-                onClick={closeMenu}
+                onClick={handleNavClick(link.to)}
                 className="flex items-center justify-between py-5 text-4xl font-bold tracking-tight sm:text-5xl"
                 style={bigLinkColor}
               >

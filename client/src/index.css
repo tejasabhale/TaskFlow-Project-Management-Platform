@@ -14,14 +14,14 @@
   color-scheme: light;
 
   /* Brand */
-  --brand: #f97316; /* orange-500: pure accent (gradients, icons, highlights) */
-  --primary: #ea580c; /* orange-600: buttons, active states */
-  --primary-hover: #c2410c; /* orange-700 */
-  --primary-active: #9a3412; /* orange-800 */
-  --primary-soft: #ffedd5; /* orange-100: tinted backgrounds, badges */
-  --primary-text: #c2410c; /* readable orange for links/text on light surfaces */
+  --brand: #f97316;
+  --primary: #ea580c;
+  --primary-hover: #c2410c;
+  --primary-active: #9a3412;
+  --primary-soft: #ffedd5;
+  --primary-text: #c2410c;
 
-  /* Layout (warm stone neutrals) */
+  /* Layout */
   --background: #fafaf9;
   --surface: #ffffff;
   --surface-muted: #f5f5f4;
@@ -44,13 +44,10 @@
   /* Status */
   --success: #15803d;
   --success-soft: #dcfce7;
-
   --warning: #a16207;
   --warning-soft: #fef9c3;
-
   --danger: #be123c;
   --danger-soft: #ffe4e6;
-
   --info: #0369a1;
   --info-soft: #e0f2fe;
 
@@ -71,7 +68,6 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-
   font-optical-sizing: auto;
   font-synthesis: none;
   font-weight: 400;
@@ -88,10 +84,10 @@
   color-scheme: dark;
 
   /* Brand */
-  --brand: #fb923c; /* orange-400 */
-  --primary: #fb923c; /* orange-400 */
-  --primary-hover: #fdba74; /* orange-300 */
-  --primary-active: #f97316; /* orange-500 */
+  --brand: #fb923c;
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-active: #f97316;
   --primary-soft: #3a1f0d;
   --primary-text: #fdba74;
 
@@ -118,13 +114,10 @@
   /* Status */
   --success: #4ade80;
   --success-soft: #14372a;
-
   --warning: #facc15;
   --warning-soft: #3a3010;
-
   --danger: #fb7185;
   --danger-soft: #451a24;
-
   --info: #7dd3fc;
   --info-soft: #153347;
 
@@ -147,10 +140,7 @@
 
 html {
   min-width: 320px;
-
-  /* Lenis controls smooth scrolling */
   scroll-behavior: auto;
-
   scrollbar-gutter: stable;
 }
 
@@ -158,10 +148,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-
   background-color: var(--background);
   color: var(--text);
-
   font-family:
     "Manrope",
     ui-sans-serif,
@@ -170,17 +158,13 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-
   font-size: 14px;
   font-weight: 400;
   line-height: 1.6;
-
   transition:
     background-color 0.2s ease,
     color 0.2s ease;
 }
-
-/* Allow the React application to grow naturally */
 
 #root {
   min-height: 100vh;
@@ -190,38 +174,26 @@ body {
    Lenis Smooth Scrolling
 ================================ */
 
-/* Let the document calculate its natural height */
-
 html.lenis,
 html.lenis body {
   height: auto;
 }
 
-/* Prevent native smooth scrolling from conflicting with Lenis */
-
 html.lenis.lenis-smooth {
   scroll-behavior: auto !important;
 }
-
-/* Also handle smooth scrolling on the body */
 
 html.lenis.lenis-smooth body {
   scroll-behavior: auto !important;
 }
 
-/* Allow designated nested scroll containers to scroll */
-
 .lenis.lenis-smooth [data-lenis-prevent] {
   overscroll-behavior: contain;
 }
 
-/* Prevent scrolling while Lenis is intentionally stopped */
-
 .lenis.lenis-stopped {
   overflow: clip;
 }
-
-/* Avoid iframe interaction blocking Lenis scrolling */
 
 .lenis.lenis-smooth iframe {
   pointer-events: none;
@@ -251,7 +223,6 @@ button:disabled {
 a {
   color: var(--primary-text);
   text-decoration: none;
-
   transition: color 0.2s ease;
 }
 
@@ -293,7 +264,6 @@ select {
   border: 1px solid var(--border);
   border-radius: 8px;
   outline: none;
-
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease,
@@ -309,7 +279,6 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--focus);
-
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
 }
 
@@ -367,7 +336,6 @@ button,
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-
   transition:
     background-color 0.2s ease,
     border-color 0.2s ease,
@@ -427,7 +395,7 @@ button,
 }
 
 /* ================================
-   Scrollbars
+   Global Scrollbars
 ================================ */
 
 * {
@@ -454,18 +422,78 @@ button,
 }
 
 /* ================================
+   Tasks Dropdown Scrollbars
+   Only assignee dropdowns opt into the visible style.
+   Other task dropdowns explicitly hide their scrollbar.
+================================ */
+
+.tasks-dropdown-options {
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.tasks-dropdown-options--hidden {
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  -ms-overflow-style: none;
+}
+
+.tasks-dropdown-options--hidden::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.tasks-dropdown-options--visible {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) var(--surface-muted);
+  -ms-overflow-style: auto;
+}
+
+.tasks-dropdown-options--visible::-webkit-scrollbar {
+  display: block;
+  width: 9px;
+  height: 9px;
+}
+
+.tasks-dropdown-options--visible::-webkit-scrollbar-track {
+  margin-block: 5px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.tasks-dropdown-options--visible::-webkit-scrollbar-thumb {
+  min-height: 30px;
+  background: var(--primary);
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  transition: background-color 160ms ease;
+}
+
+.tasks-dropdown-options--visible::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-hover);
+}
+
+.tasks-dropdown-options--visible::-webkit-scrollbar-thumb:active {
+  background: var(--primary-active);
+}
+
+.tasks-dropdown-options--visible::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ================================
    Mobile Navbar Dropdown
 ================================ */
 
 .mobile-menu-shell {
   display: grid;
   grid-template-rows: 0fr;
-
   overflow: hidden;
   opacity: 0;
   visibility: hidden;
   transform: translateY(-6px);
-
   transition:
     grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1),
     opacity 200ms ease,
@@ -475,11 +503,9 @@ button,
 
 .mobile-menu-shell.is-open {
   grid-template-rows: 1fr;
-
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
-
   transition:
     grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1),
     opacity 200ms ease,
@@ -491,15 +517,11 @@ button,
   display: flex;
   flex-direction: column;
   gap: 4px;
-
   min-height: 0;
   overflow: hidden;
-
   padding: 0 1rem;
   border-top: 1px solid transparent;
-
   background-color: var(--surface);
-
   transition:
     padding 250ms ease,
     border-color 200ms ease;
@@ -508,7 +530,6 @@ button,
 .mobile-menu-shell.is-open .mobile-menu-inner {
   padding-top: 0.75rem;
   padding-bottom: 0.75rem;
-
   border-top-color: var(--border);
 }
 
@@ -519,7 +540,6 @@ button,
 .mobile-nav-item {
   opacity: 0;
   transform: translateY(-6px);
-
   transition:
     opacity 180ms ease,
     transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -531,8 +551,6 @@ button,
   opacity: 1;
   transform: translateY(0);
 }
-
-/* Staggered entrance */
 
 .mobile-menu-shell.is-open .mobile-nav-item[data-index="0"] {
   transition-delay: 0ms;
@@ -560,18 +578,15 @@ button,
 
 .menu-toggle-icon {
   position: relative;
-
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   width: 20px;
   height: 20px;
 }
 
 .menu-toggle-symbol {
   position: absolute;
-
   transition:
     opacity 160ms ease,
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -606,8 +621,6 @@ button,
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-
-/* Respect reduced-motion preferences */
 
 @media (prefers-reduced-motion: reduce) {
   *,

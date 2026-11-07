@@ -6,6 +6,7 @@ import {
     useRef,
     useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { gsap } from "gsap";
 import {
@@ -20,11 +21,11 @@ import {
     X,
 } from "lucide-react";
 
-import { useWorkspace } from "../../context/WorkspaceContext.jsx";
+import { useWorkspace } from "../../hooks/useWorkspace.js";
 import { getTasks, createTask } from "../../services/task.service.js";
-import api from "../../api/axios";
+import { getProjects } from "../../services/project.service.js";
 
-/* Same loader id as Login / Register / Overview, so the font is only added once */
+/* Same loader id as Login / Register / Overview */
 const DISPLAY_FONT_ID = "login-display-font";
 const DISPLAY_FONT_URL =
     "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
@@ -34,7 +35,6 @@ const displayFont = {
         '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
 };
 
-/* index.css sets an unlayered color on <a>, so link colors are inline */
 const taskLinkStyle = { color: "var(--text)" };
 
 const STATUSES = [
@@ -44,7 +44,9 @@ const STATUSES = [
     { key: "completed", label: "Completed", color: "var(--success)" },
 ];
 
-const STATUS_BY_KEY = Object.fromEntries(STATUSES.map((s) => [s.key, s]));
+const STATUS_BY_KEY = Object.fromEntries(
+    STATUSES.map((status) => [status.key, status])
+);
 
 const STATUS_FILTER_OPTIONS = [
     { value: "All", label: "All statuses" },
@@ -165,7 +167,76 @@ function formatPriority(priority = "medium") {
 }
 
 /* ---------------------------------------------------------------
-   Themed dropdown (replaces the native select and its option list)
+   Dropdown scroll helpers
+---------------------------------------------------------------- */
+
+function scrollTriggerToMakeRoom(element, requiredHeight) {
+    if (!element) return;
+
+    const viewportPadding = 12;
+    const menuGap = 6;
+    const rect = element.getBoundingClientRect();
+
+    const overflow =
+        rect.bottom + menuGap + requiredHeight + viewportPadding -
+        window.innerHeight;
+
+    if (overflow <= 0) return;
+
+    let remaining = overflow + 16;
+    let parent = element.parentElement;
+
+    /* Scroll the nearest scrollable containers first */
+    while (
+        parent &&
+        parent !== document.body &&
+        parent !== document.documentElement &&
+        remaining > 0
+    ) {
+        const styles = window.getComputedStyle(parent);
+        const isScrollable =
+            /(auto|scroll|overlay)/.test(styles.overflowY) &&
+            parent.scrollHeight > parent.clientHeight + 1;
+
+        if (isScrollable) {
+            const maxScroll = Math.max(
+                0,
+                parent.scrollHeight - parent.clientHeight
+            );
+            const availableScroll = Math.max(
+                0,
+                maxScroll - parent.scrollTop
+            );
+            const scrollAmount = Math.min(remaining, availableScroll);
+
+            if (scrollAmount > 0) {
+                parent.scrollBy({
+                    top: scrollAmount,
+                    behavior: "smooth",
+                });
+                remaining -= scrollAmount;
+            }
+        }
+
+        parent = parent.parentElement;
+    }
+
+    /* Scroll the main page if additional space is required */
+    if (remaining > 1) {
+        window.scrollBy({
+            top: remaining,
+            behavior: "smooth",
+        });
+    }
+}
+
+/* ---------------------------------------------------------------
+   Themed Dropdown
+   - Always opens downward
+   - Automatically scrolls to create space
+   - Uses portal to escape overflow containers
+   - Scrollbar visibility is configurable per dropdown
+   - Scrollbar appearance is defined in the global stylesheet
 ---------------------------------------------------------------- */
 
 function Dropdown({
@@ -178,35 +249,103 @@ function Dropdown({
     disabled = false,
     className = "",
     buttonClassName = field,
+    showScrollbar = false,
 }) {
     const [open, setOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
-    const [dropUp, setDropUp] = useState(false);
+    const [position, setPosition] = useState(null);
 
     const rootRef = useRef(null);
+    const buttonRef = useRef(null);
     const menuRef = useRef(null);
 
     const selectedIndex = options.findIndex(
         (option) => String(option.value) === String(value)
     );
     const selected = options[selectedIndex];
+    const menuHeight = Math.min(options.length * 40 + 8, 256);
 
-    /* Close on outside click */
+    /* Calculate the fixed-position menu coordinates */
+    const updateMenuPosition = useCallback(() => {
+        const button = buttonRef.current;
+        if (!button) return;
+
+        const rect = button.getBoundingClientRect();
+        const viewportPadding = 8;
+        const menuGap = 6;
+        const top = rect.bottom + menuGap;
+        const availableHeight = Math.max(
+            0,
+            window.innerHeight - top - viewportPadding
+        );
+        const viewportWidth = window.innerWidth;
+        const width = Math.min(
+            Math.max(rect.width, 180),
+            Math.max(0, viewportWidth - viewportPadding * 2)
+        );
+        const left = Math.max(
+            viewportPadding,
+            Math.min(
+                rect.left,
+                viewportWidth - width - viewportPadding
+            )
+        );
+
+        setPosition({
+            top,
+            left,
+            width,
+            maxHeight: Math.min(menuHeight, availableHeight),
+        });
+    }, [menuHeight]);
+
+    /* Always make room below the trigger */
+    const openMenu = () => {
+        if (disabled || options.length === 0) return;
+
+        scrollTriggerToMakeRoom(buttonRef.current, menuHeight);
+        setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+        setOpen(true);
+    };
+
+    /* Close when clicking outside */
     useEffect(() => {
         if (!open) return undefined;
 
-        const onPointerDown = (event) => {
-            if (!rootRef.current?.contains(event.target)) {
+        const handlePointerDown = (event) => {
+            const target = event.target;
+            const clickedButton = rootRef.current?.contains(target);
+            const clickedMenu = menuRef.current?.contains(target);
+
+            if (!clickedButton && !clickedMenu) {
                 setOpen(false);
             }
         };
 
-        document.addEventListener("mousedown", onPointerDown);
-
-        return () => document.removeEventListener("mousedown", onPointerDown);
+        document.addEventListener("pointerdown", handlePointerDown);
+        return () => {
+            document.removeEventListener("pointerdown", handlePointerDown);
+        };
     }, [open]);
 
-    /* Keep the highlighted option visible while using the keyboard */
+    /* Recalculate position during scrolling */
+    useLayoutEffect(() => {
+        if (!open) {
+            setPosition(null);
+            return undefined;
+        }
+
+        updateMenuPosition();
+        window.addEventListener("resize", updateMenuPosition);
+        window.addEventListener("scroll", updateMenuPosition, true);
+
+        return () => {
+            window.removeEventListener("resize", updateMenuPosition);
+            window.removeEventListener("scroll", updateMenuPosition, true);
+        };
+    }, [open, updateMenuPosition]);
+
+    /* Keep highlighted option visible */
     useEffect(() => {
         if (!open || activeIndex < 0) return;
 
@@ -215,31 +354,14 @@ function Dropdown({
             ?.scrollIntoView({ block: "nearest" });
     }, [open, activeIndex]);
 
-    const openMenu = () => {
-        if (disabled || options.length === 0) return;
-
-        const rect = rootRef.current?.getBoundingClientRect();
-
-        if (rect) {
-            const menuHeight = Math.min(options.length * 40 + 12, 256);
-            const spaceBelow = window.innerHeight - rect.bottom;
-
-            setDropUp(spaceBelow < menuHeight + 12 && rect.top > spaceBelow);
-        }
-
-        setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-        setOpen(true);
-    };
-
     const choose = (option) => {
         onChange(option.value);
         setOpen(false);
     };
 
-    const onKeyDown = (event) => {
+    const handleKeyDown = (event) => {
         if (event.key === "Escape") {
             if (open) {
-                /* Close only the menu, not the dialog behind it */
                 event.stopPropagation();
                 setOpen(false);
             }
@@ -255,7 +377,6 @@ function Dropdown({
             }
 
             const step = event.key === "ArrowDown" ? 1 : -1;
-
             setActiveIndex(
                 (previous) =>
                     (previous + step + options.length) % options.length
@@ -286,21 +407,25 @@ function Dropdown({
             return;
         }
 
-        if (event.key === "Tab") setOpen(false);
+        if (event.key === "Tab") {
+            setOpen(false);
+        }
     };
 
     return (
         <div ref={rootRef} className={`relative min-w-0 ${className}`}>
             <button
+                ref={buttonRef}
                 id={id}
                 type="button"
                 role="combobox"
                 aria-label={ariaLabel}
                 aria-haspopup="listbox"
                 aria-expanded={open}
+                aria-controls={open && id ? `${id}-listbox` : undefined}
                 disabled={disabled}
                 onClick={() => (open ? setOpen(false) : openMenu())}
-                onKeyDown={onKeyDown}
+                onKeyDown={handleKeyDown}
                 className={`${buttonClassName} flex items-center justify-between gap-2 text-left`}
             >
                 <span
@@ -318,52 +443,67 @@ function Dropdown({
                 />
             </button>
 
-            {open && (
-                <ul
-                    ref={menuRef}
-                    role="listbox"
-                    className={`absolute left-0 z-30 max-h-60 w-full min-w-[180px] overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg ${dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
-                        }`}
-                >
-                    {options.map((option, index) => {
-                        const isSelected =
-                            String(option.value) === String(value);
-                        const isActive = index === activeIndex;
+            {open &&
+                position &&
+                position.maxHeight > 0 &&
+                createPortal(
+                    <ul
+                        ref={menuRef}
+                        id={id ? `${id}-listbox` : undefined}
+                        role="listbox"
+                        className={`tasks-dropdown-options ${showScrollbar
+                                ? "tasks-dropdown-options--visible"
+                                : "tasks-dropdown-options--hidden"
+                            } fixed overflow-y-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1`}
+                        style={{
+                            position: "fixed",
+                            top: position.top,
+                            left: position.left,
+                            width: position.width,
+                            maxHeight: position.maxHeight,
+                            zIndex: 2147483647,
+                            boxShadow: "none",
+                            WebkitOverflowScrolling: "touch",
+                            touchAction: "pan-y",
+                        }}
+                    >
+                        {options.map((option, index) => {
+                            const isSelected =
+                                String(option.value) === String(value);
+                            const isActive = index === activeIndex;
 
-                        return (
-                            <li
-                                key={`${option.value}-${index}`}
-                                data-index={index}
-                                role="option"
-                                aria-selected={isSelected}
-                                onMouseEnter={() => setActiveIndex(index)}
-                                onMouseDown={(event) => {
-                                    event.preventDefault();
-                                    choose(option);
-                                }}
-                                className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-100 ${isSelected
-                                        ? "bg-[var(--primary-soft)] font-semibold text-[var(--primary)]"
-                                        : isActive
-                                            ? "bg-[var(--surface-muted)] font-medium text-[var(--text)]"
-                                            : "font-medium text-[var(--text)]"
-                                    }`}
-                            >
-                                <span className="truncate">
-                                    {option.label}
-                                </span>
+                            return (
+                                <li
+                                    key={`${option.value}-${index}`}
+                                    data-index={index}
+                                    role="option"
+                                    aria-selected={isSelected}
+                                    onMouseEnter={() => setActiveIndex(index)}
+                                    onClick={() => choose(option)}
+                                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-100 ${isSelected
+                                            ? "bg-[var(--primary-soft)] font-semibold text-[var(--primary)]"
+                                            : isActive
+                                                ? "bg-[var(--surface-muted)] font-medium text-[var(--text)]"
+                                                : "font-medium text-[var(--text)]"
+                                        }`}
+                                >
+                                    <span className="truncate">
+                                        {option.label}
+                                    </span>
 
-                                {isSelected && (
-                                    <Check
-                                        size={15}
-                                        aria-hidden="true"
-                                        className="shrink-0"
-                                    />
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
+                                    {isSelected && (
+                                        <Check
+                                            size={15}
+                                            aria-hidden="true"
+                                            className="shrink-0"
+                                        />
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>,
+                    document.body
+                )}
         </div>
     );
 }
@@ -412,7 +552,7 @@ export default function Tasks() {
         document.head.appendChild(link);
     }, []);
 
-    /* One quiet fade on page load. Nothing else moves on its own. */
+    /* One quiet fade on page load */
     useLayoutEffect(() => {
         const root = rootRef.current;
 
@@ -459,13 +599,10 @@ export default function Tasks() {
 
             try {
                 const response = await getTasks({ workspaceId });
-
                 if (requestId !== requestRef.current) return;
-
                 setTasks(getList(response, "tasks"));
             } catch (err) {
                 if (requestId !== requestRef.current) return;
-
                 if (mode === "initial") setTasks([]);
 
                 setError(
@@ -483,7 +620,7 @@ export default function Tasks() {
         [workspaceId]
     );
 
-    /* Reset filters when the active workspace changes */
+    /* Reset filters when workspace changes */
     useEffect(() => {
         setSearch("");
         setStatusFilter("All");
@@ -510,7 +647,6 @@ export default function Tasks() {
         };
 
         window.addEventListener("keydown", onKey);
-
         return () => window.removeEventListener("keydown", onKey);
     }, [createOpen, creatingTask]);
 
@@ -519,7 +655,6 @@ export default function Tasks() {
         if (!createMessage) return;
 
         const timer = setTimeout(() => setCreateMessage(""), 4000);
-
         return () => clearTimeout(timer);
     }, [createMessage]);
 
@@ -535,7 +670,6 @@ export default function Tasks() {
             if (!id || seen.has(id)) return;
 
             seen.add(id);
-
             result.push({
                 _id: id,
                 name: getPersonName(person),
@@ -576,7 +710,7 @@ export default function Tasks() {
         );
     }, [tasks]);
 
-    /* Dropdown option lists */
+    /* Dropdown options */
     const assigneeFilterOptions = useMemo(
         () => [
             { value: "All", label: "All assignees" },
@@ -623,9 +757,7 @@ export default function Tasks() {
 
             const matchesStatus =
                 statusFilter === "All" || task.status === statusFilter;
-
             const assigneeId = getId(task.assignedTo);
-
             const matchesAssignee =
                 assigneeFilter === "All" ||
                 (assigneeFilter === "Unassigned"
@@ -644,11 +776,11 @@ export default function Tasks() {
             { label: "Total tasks", value: tasks.length },
             {
                 label: "Completed",
-                value: tasks.filter((t) => t.status === "completed").length,
+                value: tasks.filter((task) => task.status === "completed").length,
             },
             {
                 label: "In progress",
-                value: tasks.filter((t) => t.status === "inProgress").length,
+                value: tasks.filter((task) => task.status === "inProgress").length,
             },
             { label: "Overdue", value: overdue, alert: overdue > 0 },
         ];
@@ -656,7 +788,6 @@ export default function Tasks() {
 
     const updateTaskForm = (event) => {
         const { name, value } = event.target;
-
         setTaskForm((current) => ({
             ...current,
             [name]: value,
@@ -681,9 +812,7 @@ export default function Tasks() {
         setProjects([]);
 
         try {
-            const response = await api.get("/projects", {
-                params: { workspaceId },
-            });
+            const response = await getProjects({ workspaceId });
 
             const projectList = getList(response, "projects").filter(
                 (project) =>
@@ -692,7 +821,6 @@ export default function Tasks() {
             );
 
             setProjects(projectList);
-
             setTaskForm((current) => ({
                 ...current,
                 project: getId(projectList[0]),
@@ -788,7 +916,6 @@ export default function Tasks() {
             setCreateOpen(false);
             setTaskForm(initialTaskForm);
             setCreateMessage("Task created.");
-
             await loadTasks("refresh");
         } catch (err) {
             setCreateError(
@@ -830,7 +957,6 @@ export default function Tasks() {
                     </p>
                 </div>
 
-                {/* Workspace selector removed. Active workspace comes from WorkspaceContext. */}
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
                     <button
                         type="button"
@@ -875,9 +1001,7 @@ export default function Tasks() {
                     className="flex items-start gap-3 rounded-xl border border-[var(--danger)]/15 bg-[var(--danger-soft)] px-4 py-3.5 text-sm leading-5 text-[var(--danger)] sm:px-5"
                 >
                     <AlertCircle size={17} className="mt-0.5 shrink-0" />
-
                     <span className="flex-1">{error}</span>
-
                     <button
                         type="button"
                         onClick={() => loadTasks("initial")}
@@ -901,11 +1025,10 @@ export default function Tasks() {
                         <p className="text-xs font-medium text-[var(--text-muted)] sm:text-sm">
                             {stat.label}
                         </p>
-
                         <p
                             className={`mt-3 text-3xl font-bold tabular-nums tracking-tight ${stat.alert
-                                ? "text-[var(--danger)]"
-                                : "text-[var(--text)]"
+                                    ? "text-[var(--danger)]"
+                                    : "text-[var(--text)]"
                                 }`}
                             style={displayFont}
                         >
@@ -923,7 +1046,6 @@ export default function Tasks() {
                             <h2 className="text-sm font-semibold sm:text-base">
                                 {canViewAllTasks ? "All tasks" : "Assigned to me"}
                             </h2>
-
                             <p className="mt-1 text-xs text-[var(--text-muted)] sm:text-sm">
                                 {loadingTasks
                                     ? "Loading tasks..."
@@ -953,8 +1075,8 @@ export default function Tasks() {
 
                     <div
                         className={`grid grid-cols-1 gap-2.5 ${canViewAllTasks
-                            ? "lg:grid-cols-[minmax(240px,1fr)_190px_210px]"
-                            : "sm:grid-cols-[minmax(240px,1fr)_190px]"
+                                ? "lg:grid-cols-[minmax(240px,1fr)_190px_210px]"
+                                : "sm:grid-cols-[minmax(240px,1fr)_190px]"
                             }`}
                     >
                         <div className="relative min-w-0 flex-1">
@@ -963,7 +1085,6 @@ export default function Tasks() {
                                 aria-hidden="true"
                                 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-subtle)]"
                             />
-
                             <input
                                 type="search"
                                 aria-label="Search tasks"
@@ -974,6 +1095,7 @@ export default function Tasks() {
                             />
                         </div>
 
+                        {/* Status dropdown: scrollbar remains hidden */}
                         <Dropdown
                             ariaLabel="Filter tasks by status"
                             value={statusFilter}
@@ -981,12 +1103,14 @@ export default function Tasks() {
                             onChange={setStatusFilter}
                         />
 
+                        {/* Assignee dropdown: styled visible scrollbar */}
                         {canViewAllTasks && (
                             <Dropdown
                                 ariaLabel="Filter tasks by assignee"
                                 value={assigneeFilter}
                                 options={assigneeFilterOptions}
                                 onChange={setAssigneeFilter}
+                                showScrollbar
                             />
                         )}
                     </div>
@@ -1006,13 +1130,11 @@ export default function Tasks() {
                                 <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
                                     Assigned to
                                 </th>
-
                                 {canViewAllTasks && (
                                     <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
                                         Created by
                                     </th>
                                 )}
-
                                 <th className="whitespace-nowrap px-4 py-3.5 font-semibold">
                                     Priority
                                 </th>
@@ -1039,7 +1161,6 @@ export default function Tasks() {
                                             size={20}
                                             className="mx-auto animate-spin text-[var(--primary)]"
                                         />
-
                                         <p className="mt-3 text-sm text-[var(--text-muted)]">
                                             Loading tasks...
                                         </p>
@@ -1050,15 +1171,12 @@ export default function Tasks() {
                                     const status =
                                         STATUS_BY_KEY[task.status] ||
                                         STATUS_BY_KEY.todo;
-
                                     const priority = task.priority || "medium";
                                     const overdue = isOverdue(task);
                                     const taskId = getId(task);
-
                                     const labels = Array.isArray(task.labels)
                                         ? task.labels
                                         : [];
-
                                     const attachments = Array.isArray(
                                         task.attachments
                                     )
@@ -1086,7 +1204,6 @@ export default function Tasks() {
                                                         {task.title || "Untitled task"}
                                                     </span>
                                                 )}
-
                                                 {task.description && (
                                                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">
                                                         {task.description}
@@ -1100,8 +1217,8 @@ export default function Tasks() {
 
                                             <td
                                                 className={`max-w-[180px] px-4 py-4 ${task.assignedTo
-                                                    ? ""
-                                                    : "text-[var(--text-subtle)]"
+                                                        ? ""
+                                                        : "text-[var(--text-subtle)]"
                                                     }`}
                                             >
                                                 {getPersonName(task.assignedTo)}
@@ -1115,8 +1232,8 @@ export default function Tasks() {
 
                                             <td
                                                 className={`whitespace-nowrap px-4 py-4 ${priority === "high"
-                                                    ? "font-semibold text-[var(--danger)]"
-                                                    : "text-[var(--text-muted)]"
+                                                        ? "font-semibold text-[var(--danger)]"
+                                                        : "text-[var(--text-muted)]"
                                                     }`}
                                             >
                                                 {formatPriority(priority)}
@@ -1124,12 +1241,11 @@ export default function Tasks() {
 
                                             <td
                                                 className={`whitespace-nowrap px-4 py-4 ${overdue
-                                                    ? "font-semibold text-[var(--danger)]"
-                                                    : "text-[var(--text-muted)]"
+                                                        ? "font-semibold text-[var(--danger)]"
+                                                        : "text-[var(--text-muted)]"
                                                     }`}
                                             >
                                                 {formatDate(task.dueDate)}
-
                                                 {overdue && (
                                                     <span className="mt-0.5 block text-xs font-medium">
                                                         Overdue
@@ -1146,7 +1262,6 @@ export default function Tasks() {
                                                             background: status.color,
                                                         }}
                                                     />
-
                                                     {status.label}
                                                 </span>
                                             </td>
@@ -1188,9 +1303,9 @@ export default function Tasks() {
                                                             <span
                                                                 className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]"
                                                                 title={`${attachments.length} attachment${attachments.length ===
-                                                                    1
-                                                                    ? ""
-                                                                    : "s"
+                                                                        1
+                                                                        ? ""
+                                                                        : "s"
                                                                     }`}
                                                             >
                                                                 <Paperclip
@@ -1219,7 +1334,6 @@ export default function Tasks() {
                                                     : "No tasks are assigned to you"
                                                 : "No tasks match your filters"}
                                         </p>
-
                                         <p className="mx-auto mt-1 max-w-sm text-sm leading-5 text-[var(--text-muted)]">
                                             {tasks.length > 0
                                                 ? "Try a different search or clear a filter."
@@ -1263,7 +1377,6 @@ export default function Tasks() {
                                 >
                                     Create task
                                 </h2>
-
                                 <p className="mt-1.5 text-sm text-[var(--text-muted)]">
                                     Add a task to{" "}
                                     {currentWorkspace?.name || "this workspace"}.
@@ -1301,7 +1414,6 @@ export default function Tasks() {
                                 >
                                     Title
                                 </label>
-
                                 <input
                                     id="task-title"
                                     name="title"
@@ -1322,7 +1434,6 @@ export default function Tasks() {
                                 >
                                     Description
                                 </label>
-
                                 <textarea
                                     id="task-description"
                                     name="description"
@@ -1342,7 +1453,6 @@ export default function Tasks() {
                                 >
                                     Project
                                 </label>
-
                                 <Dropdown
                                     id="task-project"
                                     className="mt-1.5"
@@ -1367,13 +1477,14 @@ export default function Tasks() {
                                 >
                                     Assign to
                                 </label>
-
+                                {/* Member selection: styled visible scrollbar */}
                                 <Dropdown
                                     id="task-assignee"
                                     className="mt-1.5"
                                     value={taskForm.assignedTo}
                                     options={memberOptions}
                                     onChange={setFormValue("assignedTo")}
+                                    showScrollbar
                                 />
                             </div>
 
@@ -1385,7 +1496,6 @@ export default function Tasks() {
                                     >
                                         Priority
                                     </label>
-
                                     <Dropdown
                                         id="task-priority"
                                         className="mt-1.5"
@@ -1402,7 +1512,6 @@ export default function Tasks() {
                                     >
                                         Due date
                                     </label>
-
                                     <input
                                         id="task-due-date"
                                         name="dueDate"
@@ -1423,7 +1532,6 @@ export default function Tasks() {
                                 >
                                     Cancel
                                 </button>
-
                                 <button
                                     type="submit"
                                     disabled={

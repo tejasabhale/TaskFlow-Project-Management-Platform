@@ -15,7 +15,7 @@ import {
     Check,
 } from "lucide-react";
 
-import { useWorkspace } from "../../context/WorkspaceContext.jsx";
+import { useWorkspace } from "../../hooks/useWorkspace.js";
 import { getProjects, createProject } from "../../services/project.service.js";
 import { getTasks } from "../../services/task.service.js";
 
@@ -37,16 +37,16 @@ const statusStyles = {
         color: "var(--text-muted)",
     },
     Active: {
-        backgroundColor: "var(--primary-soft, #e1f2ef)",
-        color: "var(--primary)",
+        backgroundColor: "var(--primary-soft)",
+        color: "var(--primary-text)",
     },
     Completed: {
-        backgroundColor: "#ecfdf5",
-        color: "#047857",
+        backgroundColor: "var(--success-soft)",
+        color: "var(--success)",
     },
     Archived: {
-        backgroundColor: "#f1f5f9",
-        color: "#64748b",
+        backgroundColor: "var(--surface-muted)",
+        color: "var(--text-subtle)",
     },
 };
 

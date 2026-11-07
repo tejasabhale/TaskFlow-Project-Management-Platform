@@ -194,7 +194,7 @@ const getProjects = asyncHandler(async (req, res) => {
 
   const projects = await populateProject(
     Project.find(filter).sort({ updatedAt: -1 }),
-  );
+  ).lean();
 
   return res
     .status(200)
