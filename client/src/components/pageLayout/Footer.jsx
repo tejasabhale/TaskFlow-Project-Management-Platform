@@ -70,7 +70,7 @@ const footerLinks = {
     { label: "About", to: "/about" },
     { label: "Pricing", to: "/pricing" },
     { label: "FAQ", to: "/faq" },
-    { label: "Blog", to: "/blog" },
+    // { label: "Blog", to: "/blog" },
     { label: "Contact", to: "/contact" },
   ],
 };
