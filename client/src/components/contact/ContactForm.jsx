@@ -149,7 +149,7 @@ export default function ContactForm() {
             initial={reduce ? false : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: EASE, delay: 0.35 }}
-            className="w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xl shadow-black/[0.05]"
+            className="w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
         >
             {/* compose-window header: shows exactly where the message goes */}
             <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] px-6 py-4 sm:px-8">

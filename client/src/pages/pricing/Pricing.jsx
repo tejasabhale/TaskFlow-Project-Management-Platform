@@ -88,7 +88,10 @@ function CheckBadge() {
         <span
             aria-hidden="true"
             className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
-            style={{ backgroundColor: "var(--primary)", color: "#ffffff" }}
+            style={{
+                backgroundColor: "var(--primary)",
+                color: "var(--text-inverse)",
+            }}
         >
             <Check size={10} strokeWidth={3.5} />
         </span>
@@ -131,7 +134,7 @@ export default function Pricing() {
             ref={pageRef}
             id="pricing"
             aria-labelledby="pricing-heading"
-            className="relative isolate flex min-h-[calc(100svh-4rem)] w-full items-center overflow-hidden border-b border-[var(--border)] bg-[var(--background)] py-14 text-[var(--text)] sm:py-16 lg:py-20"
+            className="relative isolate flex min-h-[calc(100svh-4rem)] w-full items-center overflow-hidden border-b border-[var(--border)] bg-[var(--background)] py-12 text-[var(--text)] sm:py-16 lg:py-20"
         >
             {/* faint dot grid, fades out toward the edges */}
             <div
@@ -144,7 +147,7 @@ export default function Pricing() {
                 <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
                     <h1
                         id="pricing-heading"
-                        className="font-['Plus_Jakarta_Sans',sans-serif] text-[40px] font-extrabold leading-[1.05] tracking-[-0.055em] sm:text-5xl lg:text-6xl"
+                        className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.05em] min-[400px]:text-[40px] sm:text-5xl lg:text-6xl"
                     >
                         <Line>Every feature</Line>
                         <Line>
@@ -154,17 +157,17 @@ export default function Pricing() {
 
                     <p
                         data-pricing-fade
-                        className="mt-6 max-w-xl text-base leading-7 text-[var(--text-muted)] sm:text-lg sm:leading-8"
+                        className="mt-5 max-w-xl text-base leading-7 text-[var(--text-muted)] sm:mt-6 sm:text-lg sm:leading-8"
                     >
                         TaskFlow has one plan, and everything is in it. No trial clock, no
                         paid tiers, and no feature held back for later.
                     </p>
                 </div>
 
-                {/* Plan and features, sitting directly on the page background */}
+                {/* Plan and features. One centered column on mobile and tablet, two columns on desktop. */}
                 <div
                     data-pricing-panel
-                    className="mt-12 grid w-full gap-12 sm:mt-14 lg:grid-cols-[0.78fr_1.22fr] lg:gap-0"
+                    className="mx-auto mt-10 grid w-full max-w-2xl gap-10 sm:mt-14 lg:max-w-none lg:grid-cols-[0.78fr_1.22fr] lg:gap-0"
                 >
                     {/* Plan */}
                     <div className="flex flex-col lg:pr-12">
@@ -173,14 +176,14 @@ export default function Pricing() {
                                 src="/taskflow-logo.svg"
                                 alt=""
                                 aria-hidden="true"
-                                className="size-6 shrink-0 object-contain"
+                                className="h-6 w-auto shrink-0 object-contain"
                             />
                             <p className="text-sm font-bold text-[var(--text)]">
                                 TaskFlow plan
                             </p>
                         </div>
 
-                        <p className="mt-6 font-['Plus_Jakarta_Sans',sans-serif] text-6xl font-extrabold leading-none tracking-[-0.06em] text-[var(--text)] sm:text-7xl">
+                        <p className="mt-5 text-6xl font-extrabold leading-none tracking-[-0.05em] text-[var(--text)] sm:mt-6 sm:text-7xl">
                             Free
                         </p>
 
@@ -189,7 +192,7 @@ export default function Pricing() {
                             workspace, and start planning.
                         </p>
 
-                        <ul className="mt-8 space-y-2.5 border-t border-[var(--border)] pt-6">
+                        <ul className="mt-6 space-y-2.5 border-t border-[var(--border)] pt-6 sm:mt-8">
                             {perks.map((perk) => (
                                 <li
                                     key={perk}
@@ -203,7 +206,7 @@ export default function Pricing() {
 
                         <Link
                             to="/register"
-                            className="group relative mt-8 inline-flex min-h-12 items-center justify-center self-start overflow-hidden rounded-xl border border-[var(--primary)] bg-[var(--primary)] px-7 py-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)] lg:mt-auto"
+                            className="group relative mt-8 inline-flex min-h-12 w-full items-center justify-center overflow-hidden rounded-xl border border-[var(--primary)] bg-[var(--primary)] px-7 py-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)] sm:w-auto sm:self-start lg:mt-auto"
                         >
                             {/* black fill slides up from the bottom on hover */}
                             <span
@@ -217,12 +220,12 @@ export default function Pricing() {
                     </div>
 
                     {/* Included features */}
-                    <div className="lg:border-l lg:border-[var(--border)] lg:pl-12">
+                    <div className="border-t border-[var(--border)] pt-10 lg:border-l lg:border-t-0 lg:pl-12 lg:pt-0">
                         <div className="flex items-center justify-between gap-3">
-                            <h2 className="font-['Plus_Jakarta_Sans',sans-serif] text-base font-extrabold tracking-[-0.03em] text-[var(--text)] sm:text-lg">
+                            <h2 className="text-base font-extrabold tracking-[-0.02em] text-[var(--text)] sm:text-lg">
                                 Everything included
                             </h2>
-                            <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--primary)]">
+                            <span className="shrink-0 rounded-full bg-[var(--primary-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--primary-text)]">
                                 All free
                             </span>
                         </div>
@@ -231,7 +234,7 @@ export default function Pricing() {
                             {included.map(({ title, description, icon: Icon }) => (
                                 <li
                                     key={title}
-                                    className="flex min-w-0 items-center gap-3.5 py-3.5 sm:py-4"
+                                    className="flex min-w-0 items-center gap-3.5 py-4"
                                 >
                                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--primary)]">
                                         <Icon size={18} strokeWidth={1.8} />
@@ -241,7 +244,7 @@ export default function Pricing() {
                                         <h3 className="text-sm font-bold text-[var(--text)]">
                                             {title}
                                         </h3>
-                                        <p className="mt-0.5 text-xs leading-6 text-[var(--text-muted)] sm:text-[13px]">
+                                        <p className="mt-0.5 text-[13px] leading-6 text-[var(--text-muted)]">
                                             {description}
                                         </p>
                                     </div>
@@ -253,20 +256,20 @@ export default function Pricing() {
                     </div>
                 </div>
 
-                {/* Questions, separated by lines only */}
+                {/* Questions: stacked with dividers on mobile, three columns from md */}
                 <div
                     data-pricing-fade
-                    className="mt-12 grid w-full border-t border-[var(--border)] sm:mt-14 sm:grid-cols-3 sm:divide-x sm:divide-[var(--border)]"
+                    className="mx-auto mt-10 grid w-full max-w-2xl divide-y divide-[var(--border)] border-t border-[var(--border)] sm:mt-14 md:max-w-none md:grid-cols-3 md:divide-x md:divide-y-0"
                 >
                     {questions.map(({ question, answer }) => (
                         <div
                             key={question}
-                            className="py-6 sm:px-8 sm:first:pl-0 sm:last:pr-0"
+                            className="py-6 md:px-8 md:first:pl-0 md:last:pr-0"
                         >
-                            <h3 className="font-['Plus_Jakarta_Sans',sans-serif] text-sm font-extrabold tracking-[-0.02em] text-[var(--text)]">
+                            <h3 className="text-sm font-extrabold tracking-[-0.015em] text-[var(--text)]">
                                 {question}
                             </h3>
-                            <p className="mt-2 max-w-xs text-xs leading-6 text-[var(--text-muted)] sm:text-sm sm:leading-7">
+                            <p className="mt-2 text-sm leading-7 text-[var(--text-muted)] md:max-w-xs">
                                 {answer}
                             </p>
                         </div>

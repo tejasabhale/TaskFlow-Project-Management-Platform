@@ -1,27 +1,33 @@
-import nodemailer from "nodemailer";
+import axios from "axios";
 
-const isMailConfigured = Boolean(
-  process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS,
-);
+export const sendEmail = async ({ to, subject, html }) => {
+  try {
+    const response = await axios.post(
+      "https://smtp.maileroo.com/api/v2/emails",
+      {
+        from: {
+          address: process.env.EMAIL_FROM,
+          display_name: process.env.EMAIL_FROM_NAME,
+        },
+        to: [
+          {
+            address: to,
+          },
+        ],
+        subject,
+        html,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": process.env.MAILEROO_API_KEY,
+        },
+      },
+    );
 
-export const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: Number(process.env.EMAIL_PORT) || 587,
-  secure: Number(process.env.EMAIL_PORT) === 465,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-if (isMailConfigured) {
-  transporter.verify((error) => {
-    if (error) {
-      console.warn("SMTP Server verification warning:", error.message);
-    } else {
-      console.log("SMTP Server is ready.");
-    }
-  });
-} else {
-  console.log("SMTP credentials not fully configured; mail delivery will be simulated or skipped.");
-}
+    return response.data;
+  } catch (error) {
+    console.error("Maileroo Error:", error.response?.data || error.message);
+    throw error;
+  }
+};

@@ -1,14 +1,11 @@
-import { transporter } from "../config/mail.js";
+import { sendEmail } from "../config/mail.js";
 import { otpTemplate } from "../templates/otp.template.js";
 import { passwordChangedTemplate } from "../templates/passwordChanged.template.js";
 import { passwordResetTemplate } from "../templates/passwordReset.template.js";
 
-const FROM = `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_USER}>`;
-
 export const sendOtpEmail = async ({ to, otp }) => {
   try {
-    await transporter.sendMail({
-      from: FROM,
+    await sendEmail({
       to,
       subject: "Verify Your TaskFlow Account",
       html: otpTemplate(otp),
@@ -21,8 +18,7 @@ export const sendOtpEmail = async ({ to, otp }) => {
 
 export const sendPasswordChangedEmail = async ({ to }) => {
   try {
-    await transporter.sendMail({
-      from: FROM,
+    await sendEmail({
       to,
       subject: "Password Changed Successfully",
       html: passwordChangedTemplate(),
@@ -35,8 +31,7 @@ export const sendPasswordChangedEmail = async ({ to }) => {
 
 export const sendPasswordResetEmail = async ({ to, resetLink }) => {
   try {
-    await transporter.sendMail({
-      from: FROM,
+    await sendEmail({
       to,
       subject: "Reset Your TaskFlow Password",
       html: passwordResetTemplate(resetLink),
