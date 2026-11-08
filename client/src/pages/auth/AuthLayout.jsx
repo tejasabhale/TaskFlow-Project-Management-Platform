@@ -9,9 +9,9 @@ import { Eye, EyeOff } from "lucide-react";
    type and motion.
 ---------------------------------------------------------------- */
 
-/* Same heading face as the hero, features and about sections */
+/* Consistent primary font face (Manrope) */
 export const headingFont = {
-    fontFamily: "'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif",
+    fontFamily: "var(--font-sans)",
 };
 
 /* index.css sets an unlayered color on <a>, so link colors are inline */
@@ -232,10 +232,10 @@ export default function AuthLayout({
                         )}
 
                         <h1
-                            className="text-3xl font-extrabold leading-[1.1] tracking-[-0.045em] sm:text-4xl"
+                            className="text-2xl font-extrabold leading-[1.15] tracking-[-0.04em] min-[400px]:text-3xl sm:text-4xl"
                             style={headingFont}
                         >
-                            <span className="block overflow-hidden pb-[0.1em]">
+                            <span className="block overflow-hidden pb-[0.2em] -mb-[0.2em]">
                                 <span data-line className="block">
                                     {title}
                                 </span>

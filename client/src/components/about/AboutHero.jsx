@@ -19,7 +19,7 @@ export default function AboutHero() {
 
             <div className="relative mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-20">
                 <div>
-                    <h1 className="max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-[-0.045em] sm:text-5xl lg:text-6xl">
+                    <h1 className="max-w-3xl text-3xl font-extrabold leading-[1.12] tracking-[-0.04em] min-[400px]:text-4xl sm:text-5xl sm:leading-[1.05] sm:tracking-[-0.045em] lg:text-6xl">
                         <MaskedLine reduce={reduce}>Work moves better</MaskedLine>
                         <MaskedLine reduce={reduce} delay={0.08}>
                             when everything

@@ -48,12 +48,12 @@ export default function AboutCTA() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
                 transition={{ duration: 0.8, ease: EASE }}
-                className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl px-8 pb-40 pt-14 sm:px-12 sm:pt-16 lg:px-16 lg:pb-48"
+                className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl px-6 pb-36 pt-12 sm:px-12 sm:pt-16 lg:px-16 lg:pb-48"
                 style={{ backgroundColor: "var(--primary)", color: "#ffffff" }}
             >
                 <div className="relative z-10 flex flex-col justify-between gap-10 lg:flex-row lg:items-end">
                     <div className="max-w-2xl">
-                        <h2 className="text-3xl font-extrabold leading-tight tracking-[-0.04em] text-white sm:text-5xl">
+                        <h2 className="text-2xl font-extrabold leading-tight tracking-[-0.04em] text-white min-[400px]:text-3xl sm:text-4xl lg:text-5xl">
                             Have a question? Start with the FAQ.
                         </h2>
                         <p className="mt-5 max-w-xl text-base leading-7 text-white/85">

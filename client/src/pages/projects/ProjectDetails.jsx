@@ -28,16 +28,6 @@ import {
 } from "../../services/project.service.js";
 import { getTasks } from "../../services/task.service.js";
 
-/* Same loader id as the other pages, so the font is only added once */
-const DISPLAY_FONT_ID = "login-display-font";
-const DISPLAY_FONT_URL =
-    "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
-
-const displayFont = {
-    fontFamily:
-        '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
-};
-
 /* index.css sets an unlayered color on <a>, so link colors are inline */
 const textLinkStyle = { color: "var(--text)" };
 const primaryLinkStyle = { color: "var(--primary-text)" };
@@ -504,15 +494,6 @@ export default function ProjectDetails() {
     const [taskError, setTaskError] = useState("");
     const [success, setSuccess] = useState("");
 
-    useEffect(() => {
-        if (document.getElementById(DISPLAY_FONT_ID)) return;
-        const link = document.createElement("link");
-        link.id = DISPLAY_FONT_ID;
-        link.rel = "stylesheet";
-        link.href = DISPLAY_FONT_URL;
-        document.head.appendChild(link);
-    }, []);
-
     const hasProject = Boolean(project);
 
     /* One quiet fade when the page first shows. Nothing else moves on its own. */
@@ -753,10 +734,7 @@ export default function ProjectDetails() {
                 <section className={`${panel} ${panelPad} sm:p-8`}>
                     <AlertCircle size={26} className="text-[var(--danger)]" />
 
-                    <h1
-                        className="mt-3 text-xl font-bold tracking-tight"
-                        style={displayFont}
-                    >
+                    <h1 className="mt-3 text-xl font-bold tracking-tight">
                         Unable to display project
                     </h1>
 
@@ -822,10 +800,7 @@ export default function ProjectDetails() {
                             )}
                         </div>
 
-                        <h1
-                            className="mt-3 break-words text-3xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-4xl"
-                            style={displayFont}
-                        >
+                        <h1 className="mt-3 break-words text-2xl min-[400px]:text-3xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-4xl">
                             {project.name}
                         </h1>
 
@@ -908,10 +883,7 @@ export default function ProjectDetails() {
                     >
                         <p className="text-sm text-[var(--text-muted)]">{stat.label}</p>
 
-                        <p
-                            className="mt-2 text-3xl font-bold tabular-nums tracking-tight"
-                            style={displayFont}
-                        >
+                        <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight">
                             {loadingTasks ? "—" : stat.value}
                         </p>
 
@@ -1215,10 +1187,7 @@ export default function ProjectDetails() {
                     <section className={`${panel} ${panelPad}`}>
                         <h2 className="font-semibold">Task completion</h2>
 
-                        <p
-                            className="mt-4 text-3xl font-bold tabular-nums tracking-tight"
-                            style={displayFont}
-                        >
+                        <p className="mt-4 text-3xl font-bold tabular-nums tracking-tight">
                             {loadingTasks ? "—" : `${progress}%`}
                         </p>
 

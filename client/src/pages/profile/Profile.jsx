@@ -414,7 +414,7 @@ function EditProfilePage({ profile, onBack, onSaved }) {
             <header className="flex flex-col gap-4 border-b border-[var(--border)] pb-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0">
-                        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
+                        <h1 className="text-2xl min-[400px]:text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
                             Edit profile
                         </h1>
 
@@ -853,7 +853,7 @@ export default function Profile() {
 
             {/* Page heading */}
             <section>
-                <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
+                <h1 className="text-2xl min-[400px]:text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
                     Profile
                 </h1>
 

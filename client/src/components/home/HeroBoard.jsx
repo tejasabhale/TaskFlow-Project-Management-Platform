@@ -165,14 +165,14 @@ export default function HeroBoard() {
             </div>
 
             {/* columns (no overflow clipping, so cards are visible all the way between columns) */}
-            <div className="grid grid-cols-3 gap-2.5 p-4 sm:gap-3 sm:p-5">
+            <div className="grid grid-cols-3 gap-2 p-2.5 min-[380px]:gap-2.5 min-[380px]:p-3 sm:gap-3 sm:p-5">
                 {COLUMNS.map((name, columnIndex) => {
                     const cards = TASKS.filter((_, i) => placement[i] === columnIndex);
 
                     return (
                         <div
                             key={name}
-                            className="h-[20.5rem] rounded-xl bg-[var(--background)] p-2.5 sm:p-3"
+                            className="h-[20.5rem] rounded-xl bg-[var(--background)] p-2 sm:p-3"
                         >
                             <div className="mb-3 flex h-4 items-center justify-between px-0.5">
                                 <div className="flex items-center gap-1.5">
@@ -186,9 +186,9 @@ export default function HeroBoard() {
                                                 columnIndex === 2 ? "var(--primary)" : "transparent",
                                         }}
                                     />
-                                    <span className="text-xs font-bold text-[var(--text)]">{name}</span>
+                                    <span className="text-[11px] font-bold text-[var(--text)] sm:text-xs">{name}</span>
                                 </div>
-                                <span className="text-xs tabular-nums text-[var(--text-muted)]">
+                                <span className="text-[11px] tabular-nums text-[var(--text-muted)] sm:text-xs">
                                     {cards.length}
                                 </span>
                             </div>
@@ -218,10 +218,10 @@ export default function HeroBoard() {
                                             }}
                                             // moving cards render in front of every column and card
                                             style={{ zIndex: moving ? 50 : 1 }}
-                                            className="relative flex h-[5.25rem] flex-col justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3"
+                                            className="relative flex h-[5.25rem] flex-col justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 sm:p-3"
                                         >
                                             <p
-                                                className={`line-clamp-2 text-xs font-semibold leading-snug transition-colors duration-700 ${done ? "text-[var(--text-muted)]" : "text-[var(--text)]"
+                                                className={`line-clamp-2 text-[11px] sm:text-xs font-semibold leading-snug transition-colors duration-700 ${done ? "text-[var(--text-muted)]" : "text-[var(--text)]"
                                                     }`}
                                             >
                                                 {task.title}

@@ -494,7 +494,7 @@ export default function FAQ() {
                             Help center
                         </div>
 
-                        <h1 className="max-w-2xl text-4xl font-extrabold leading-[1.12] tracking-[-0.055em] sm:text-5xl lg:text-[58px]">
+                        <h1 className="max-w-2xl text-3xl font-extrabold leading-[1.12] tracking-[-0.04em] min-[400px]:text-4xl sm:text-5xl sm:tracking-[-0.055em] lg:text-[58px]">
                             Questions?
                             <br />
 
@@ -515,14 +515,14 @@ export default function FAQ() {
                         >
                             <a
                                 href="#faq-list"
-                                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-xs font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
-                                style={{
-                                    backgroundColor: "var(--primary)",
-                                    color: "#ffffff",
-                                }}
+                                className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--primary)] px-5 text-xs font-semibold text-white transition-colors duration-200 hover:bg-black hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]"
+                                style={{ color: "#ffffff" }}
                             >
                                 Explore FAQs
-                                <ArrowRight size={15} />
+                                <ArrowRight
+                                    size={15}
+                                    className="transition-transform duration-200 group-hover:translate-x-0.5"
+                                />
                             </a>
 
                             <a

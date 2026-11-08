@@ -506,9 +506,9 @@ export default function Projects() {
             {/* Page heading */}
             <section className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 className="text-2xl font-semibold tracking-tight">
+                    <h1 className="text-2xl min-[400px]:text-3xl font-bold tracking-tight sm:text-4xl">
                         Projects
-                    </h2>
+                    </h1>
 
                     <p
                         className="mt-1 text-sm"

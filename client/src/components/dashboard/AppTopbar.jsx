@@ -164,7 +164,7 @@ export default function AppTopbar({ sidebarOpen, onToggleSidebar }) {
             <motion.h1
               key={pageTitle}
               {...titleMotion}
-              className="mt-0.5 truncate font-['Manrope',sans-serif] text-base font-bold tracking-[-0.025em] text-[var(--text)] sm:text-lg"
+              className="mt-0.5 truncate text-base font-bold tracking-[-0.025em] text-[var(--text)] sm:text-lg"
             >
               {pageTitle}
             </motion.h1>

@@ -39,7 +39,7 @@ export default function Features() {
     return (
         <section className="border-t border-[var(--border)] bg-[var(--surface)] px-5 py-24 sm:px-8 sm:py-32">
             <div className="mx-auto max-w-7xl">
-                <h2 className="max-w-2xl text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl">
+                <h2 className="max-w-2xl text-2xl font-extrabold tracking-[-0.04em] min-[400px]:text-3xl sm:text-4xl">
                     What you can do in TaskFlow
                 </h2>
 

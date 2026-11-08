@@ -42,7 +42,6 @@ export default function EmptyState({
       <h2
         className={`font-extrabold tracking-[-0.03em] text-[var(--text)] ${compact ? "text-base" : "text-lg sm:text-xl"
           }`}
-        style={{ fontFamily: "'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif" }}
       >
         {title}
       </h2>

@@ -75,7 +75,7 @@ const questions = [
 /** Headline line that slides up from behind a mask (animated by gsap below). */
 function Line({ children }) {
     return (
-        <span className="block overflow-hidden pb-[0.1em]">
+        <span className="block overflow-hidden pb-[0.2em] -mb-[0.2em]">
             <span data-line className="block">
                 {children}
             </span>
@@ -147,7 +147,7 @@ export default function Pricing() {
                 <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
                     <h1
                         id="pricing-heading"
-                        className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.05em] min-[400px]:text-[40px] sm:text-5xl lg:text-6xl"
+                        className="text-[32px] font-extrabold leading-[1.12] tracking-[-0.045em] min-[400px]:text-[40px] sm:text-5xl sm:leading-[1.05] sm:tracking-[-0.05em] lg:text-6xl"
                     >
                         <Line>Every feature</Line>
                         <Line>

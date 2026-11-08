@@ -119,7 +119,7 @@ export default function HowItWorks() {
         <section className="px-5 py-24 sm:px-8 sm:py-32">
             <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:gap-24">
                 <div className="lg:sticky lg:top-28 lg:self-start">
-                    <h2 className="max-w-md text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
+                    <h2 className="max-w-md text-2xl font-extrabold leading-tight tracking-[-0.04em] min-[400px]:text-3xl sm:text-4xl">
                         From a goal to a finished task in three steps
                     </h2>
                     <p className="mt-5 max-w-sm text-base leading-8 text-[var(--text-muted)]">

@@ -35,7 +35,7 @@ export default function ContactIntro() {
 
     return (
         <div>
-            <h1 className="max-w-xl text-4xl font-extrabold leading-[1.1] tracking-[-0.045em] sm:text-5xl lg:text-6xl">
+            <h1 className="max-w-xl text-3xl font-extrabold leading-[1.12] tracking-[-0.04em] min-[400px]:text-4xl sm:text-5xl sm:leading-[1.05] sm:tracking-[-0.045em] lg:text-6xl">
                 <MaskedLine reduce={reduce}>Questions, feedback</MaskedLine>
                 <MaskedLine reduce={reduce} delay={0.08}>
                     or a problem?

@@ -420,7 +420,7 @@ export default function Terms() {
                             Legal / Terms
                         </div>
 
-                        <h1 className="max-w-2xl text-4xl font-extrabold leading-[1.12] tracking-[-0.055em] sm:text-5xl lg:text-[58px]">
+                        <h1 className="max-w-2xl text-3xl font-extrabold leading-[1.12] tracking-[-0.04em] min-[400px]:text-4xl sm:text-5xl sm:tracking-[-0.055em] lg:text-[58px]">
                             Clear expectations.
                             <br />
 

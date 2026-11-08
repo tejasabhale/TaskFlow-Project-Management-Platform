@@ -18,7 +18,7 @@ const RESEND_COOLDOWN = 60; // seconds, matches the API cooldown
 const EMPTY_CODE = Array(OTP_LENGTH).fill("");
 
 const otpBoxClass =
-    "h-14 w-full min-w-0 rounded-xl border text-center text-2xl font-bold tabular-nums " +
+    "h-12 sm:h-14 w-full min-w-0 rounded-xl border text-center text-xl min-[400px]:text-2xl font-bold tabular-nums " +
     "bg-[var(--background)] text-[var(--text)] border-[var(--border)] " +
     "hover:border-[var(--border-strong)] " +
     "disabled:cursor-not-allowed disabled:opacity-60";

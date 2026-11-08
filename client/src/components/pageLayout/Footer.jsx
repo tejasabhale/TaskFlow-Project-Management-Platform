@@ -236,7 +236,7 @@ export default function Footer() {
               className="size-8 shrink-0 object-contain"
             />
 
-            <span className="font-['Plus_Jakarta_Sans',sans-serif] text-lg font-extrabold tracking-[-0.045em]">
+            <span className="text-lg font-extrabold tracking-tight sm:text-xl">
               Task
               <span className="text-[var(--primary)]">Flow</span>
             </span>

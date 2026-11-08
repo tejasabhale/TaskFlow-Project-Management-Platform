@@ -591,7 +591,7 @@ export default function Features() {
         <div className="features-header mx-auto flex max-w-3xl flex-col items-center gap-5 pb-10 text-center sm:pb-12">
           <h2
             id="features-heading"
-            className="features-reveal font-['Plus_Jakarta_Sans',sans-serif] text-3xl font-extrabold leading-[1.1] tracking-[-0.045em] sm:text-4xl md:text-5xl"
+            className="features-reveal text-2xl min-[400px]:text-3xl font-extrabold leading-[1.15] tracking-[-0.04em] sm:text-4xl md:text-5xl"
           >
             Everything you need.
             <br className="hidden sm:block" />{" "}
@@ -635,7 +635,7 @@ export default function Features() {
                     {feature.label}
                   </span>
 
-                  <h3 className="font-['Plus_Jakarta_Sans',sans-serif] text-lg font-extrabold leading-snug tracking-[-0.03em] text-[var(--text)] sm:text-xl">
+                  <h3 className="text-lg font-extrabold leading-snug tracking-[-0.03em] text-[var(--text)] sm:text-xl">
                     {feature.title}
                   </h3>
 

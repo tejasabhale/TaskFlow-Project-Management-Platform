@@ -34,16 +34,6 @@ import {
     getWorkspaceMembers,
 } from "../../services/workspace.service.js";
 
-/* Same loader id as Login / Register / Overview / Tasks, so the font is only added once */
-const DISPLAY_FONT_ID = "login-display-font";
-const DISPLAY_FONT_URL =
-    "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
-
-const displayFont = {
-    fontFamily:
-        '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
-};
-
 /* Colors come from the theme variables in index.css (light + .dark) */
 const statusOptions = [
     { label: "To do", value: "todo", color: "var(--text-subtle)" },
@@ -414,15 +404,6 @@ export default function TaskDetails() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    useEffect(() => {
-        if (document.getElementById(DISPLAY_FONT_ID)) return;
-        const link = document.createElement("link");
-        link.id = DISPLAY_FONT_ID;
-        link.rel = "stylesheet";
-        link.href = DISPLAY_FONT_URL;
-        document.head.appendChild(link);
-    }, []);
-
     const hasTask = Boolean(task);
 
     /* One quiet fade when the page first shows. Nothing else moves on its own. */
@@ -731,10 +712,7 @@ export default function TaskDetails() {
                 <section className={`${panel} p-6 sm:p-8`}>
                     <AlertCircle size={26} className="text-[var(--danger)]" />
 
-                    <h1
-                        className="mt-3 text-xl font-bold tracking-tight"
-                        style={displayFont}
-                    >
+                    <h1 className="mt-3 text-xl font-bold tracking-tight">
                         Unable to display task
                     </h1>
 
@@ -789,10 +767,7 @@ export default function TaskDetails() {
 
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0">
-                        <h1
-                            className="break-words text-3xl font-bold tracking-tight sm:text-4xl"
-                            style={displayFont}
-                        >
+                        <h1 className="break-words text-2xl min-[400px]:text-3xl font-bold tracking-tight sm:text-4xl">
                             {task.title}
                         </h1>
                         <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
@@ -945,10 +920,7 @@ export default function TaskDetails() {
                                         </Field>
                                     </div>
                                 ) : (
-                                    <h2
-                                        className="mt-3 break-words text-xl font-bold tracking-tight"
-                                        style={displayFont}
-                                    >
+                                    <h2 className="mt-3 break-words text-xl font-bold tracking-tight">
                                         {task.title}
                                     </h2>
                                 )}

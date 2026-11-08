@@ -508,7 +508,7 @@ export default function Members() {
                         Workspace management
                     </p>
 
-                    <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
+                    <h1 className="text-2xl min-[400px]:text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
                         Members
                     </h1>
 

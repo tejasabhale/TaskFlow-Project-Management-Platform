@@ -25,15 +25,6 @@ import { useWorkspace } from "../../hooks/useWorkspace.js";
 import { getProjects } from "../../services/project.service.js";
 import { getTasks } from "../../services/task.service.js";
 
-const DISPLAY_FONT_ID = "login-display-font";
-const DISPLAY_FONT_URL =
-  "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
-
-const displayFont = {
-  fontFamily:
-    '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
-};
-
 const taskLinkStyle = { color: "var(--text)" };
 
 const STATUSES = [
@@ -125,17 +116,6 @@ export default function Overview() {
 
   const rootRef = useRef(null);
   const requestRef = useRef(0);
-
-  useEffect(() => {
-    if (document.getElementById(DISPLAY_FONT_ID)) return;
-
-    const link = document.createElement("link");
-    link.id = DISPLAY_FONT_ID;
-    link.rel = "stylesheet";
-    link.href = DISPLAY_FONT_URL;
-
-    document.head.appendChild(link);
-  }, []);
 
   const loadData = useCallback(
     async (mode = "initial") => {
@@ -361,10 +341,7 @@ export default function Overview() {
             Workspace overview
           </p>
 
-          <h1
-            className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl"
-            style={displayFont}
-          >
+          <h1 className="text-2xl min-[400px]:text-3xl font-bold tracking-tight sm:text-4xl">
             Overview
           </h1>
 
@@ -462,7 +439,6 @@ export default function Overview() {
                         ? "text-[var(--danger)]"
                         : "text-[var(--text)]"
                       }`}
-                    style={displayFont}
                   >
                     {loadingData ? "—" : stat.value}
                   </p>

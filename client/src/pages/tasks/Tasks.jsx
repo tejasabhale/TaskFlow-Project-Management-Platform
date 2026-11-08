@@ -25,16 +25,6 @@ import { useWorkspace } from "../../hooks/useWorkspace.js";
 import { getTasks, createTask } from "../../services/task.service.js";
 import { getProjects } from "../../services/project.service.js";
 
-/* Same loader id as Login / Register / Overview */
-const DISPLAY_FONT_ID = "login-display-font";
-const DISPLAY_FONT_URL =
-    "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
-
-const displayFont = {
-    fontFamily:
-        '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
-};
-
 const taskLinkStyle = { color: "var(--text)" };
 
 const STATUSES = [
@@ -542,16 +532,6 @@ export default function Tasks() {
     const rootRef = useRef(null);
     const requestRef = useRef(0);
 
-    useEffect(() => {
-        if (document.getElementById(DISPLAY_FONT_ID)) return;
-
-        const link = document.createElement("link");
-        link.id = DISPLAY_FONT_ID;
-        link.rel = "stylesheet";
-        link.href = DISPLAY_FONT_URL;
-        document.head.appendChild(link);
-    }, []);
-
     /* One quiet fade on page load */
     useLayoutEffect(() => {
         const root = rootRef.current;
@@ -943,10 +923,7 @@ export default function Tasks() {
                         Task management
                     </p>
 
-                    <h1
-                        className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl"
-                        style={displayFont}
-                    >
+                    <h1 className="text-2xl min-[400px]:text-3xl font-bold tracking-tight sm:text-4xl">
                         {canViewAllTasks ? "Workspace tasks" : "My tasks"}
                     </h1>
 
@@ -1030,7 +1007,6 @@ export default function Tasks() {
                                     ? "text-[var(--danger)]"
                                     : "text-[var(--text)]"
                                 }`}
-                            style={displayFont}
                         >
                             {loadingTasks ? "—" : stat.value}
                         </p>
@@ -1373,7 +1349,6 @@ export default function Tasks() {
                                 <h2
                                     id="create-task-title"
                                     className="text-2xl font-bold tracking-tight"
-                                    style={displayFont}
                                 >
                                     Create task
                                 </h2>

@@ -22,16 +22,6 @@ import {
 
 import { getUserProfileById } from "../../services/profile.service.js";
 
-/* Same loader id as other pages */
-const DISPLAY_FONT_ID = "login-display-font";
-const DISPLAY_FONT_URL =
-    "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap";
-
-const displayFont = {
-    fontFamily:
-        '"Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif',
-};
-
 /* Full available dashboard width */
 const pageWrap =
     "w-full min-h-full min-w-0 space-y-6 p-4 text-[var(--text)] sm:space-y-7 sm:p-6 lg:p-8";
@@ -175,7 +165,6 @@ function MemberAvatar({ member }) {
         <div
             aria-hidden="true"
             className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-[var(--primary-soft)] text-2xl font-bold text-[var(--primary)] sm:size-24"
-            style={displayFont}
         >
             {getInitials(member.fullName)}
         </div>
@@ -194,18 +183,6 @@ export default function MemberDetails() {
     const [reloadKey, setReloadKey] = useState(0);
 
     const hasMember = Boolean(member);
-
-    /* Load display font once */
-    useEffect(() => {
-        if (document.getElementById(DISPLAY_FONT_ID)) return;
-
-        const link = document.createElement("link");
-        link.id = DISPLAY_FONT_ID;
-        link.rel = "stylesheet";
-        link.href = DISPLAY_FONT_URL;
-
-        document.head.appendChild(link);
-    }, []);
 
     /* One quiet entrance animation */
     useLayoutEffect(() => {
@@ -322,10 +299,7 @@ export default function MemberDetails() {
                             <AlertCircle size={24} />
                         </div>
 
-                        <h1
-                            className="mt-4 text-xl font-bold tracking-tight"
-                            style={displayFont}
-                        >
+                        <h1 className="mt-4 text-xl font-bold tracking-tight">
                             Unable to display member
                         </h1>
 
@@ -413,10 +387,7 @@ export default function MemberDetails() {
                 <BackLink />
 
                 <div className="min-w-0">
-                    <h1
-                        className="break-words text-3xl font-bold tracking-tight sm:text-4xl"
-                        style={displayFont}
-                    >
+                    <h1 className="break-words text-2xl min-[400px]:text-3xl font-bold tracking-tight sm:text-4xl">
                         Member details
                     </h1>
 
@@ -435,10 +406,7 @@ export default function MemberDetails() {
                     <MemberAvatar member={member} />
 
                     <div className="min-w-0 flex-1">
-                        <h2
-                            className="break-words text-xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-2xl"
-                            style={displayFont}
-                        >
+                        <h2 className="break-words text-xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-2xl">
                             {member.fullName || "Unnamed member"}
                         </h2>
 

@@ -478,7 +478,7 @@ const DashboardPreview = () => {
                                             WORKSPACE OVERVIEW
                                         </p>
 
-                                        <h2 className="font-['Plus_Jakarta_Sans',sans-serif] text-lg font-extrabold tracking-[-0.03em] text-[var(--text)] sm:text-2xl">
+                                        <h2 className="text-lg font-extrabold tracking-[-0.03em] text-[var(--text)] sm:text-2xl">
                                             Your dashboard
                                         </h2>
 

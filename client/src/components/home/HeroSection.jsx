@@ -6,7 +6,7 @@ import HeroBoard from "./HeroBoard";
 /** Headline line that slides up from behind a mask (animated by gsap below). */
 function Line({ children }) {
   return (
-    <span className="block overflow-hidden pb-[0.1em]">
+    <span className="block overflow-hidden pb-[0.2em] -mb-[0.2em]">
       <span data-line className="block">
         {children}
       </span>
@@ -60,7 +60,7 @@ export default function HeroSection() {
       {/* two fixed-width columns, centred as a pair with a tight gap; spare room goes to the left/right edges */}
       <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 sm:py-12 lg:grid-cols-[minmax(0,34rem)_minmax(0,28rem)] lg:justify-center lg:gap-10 lg:px-12 lg:py-8">
         <div>
-          <h1 className="max-w-3xl font-['Plus_Jakarta_Sans',sans-serif] text-[40px] font-extrabold leading-[1.05] tracking-[-0.055em] sm:text-5xl lg:text-6xl">
+          <h1 className="max-w-3xl text-[32px] font-extrabold leading-[1.12] tracking-[-0.045em] min-[380px]:text-[38px] sm:text-5xl sm:leading-[1.05] sm:tracking-[-0.055em] lg:text-6xl">
             <Line>Plan less.</Line>
             <Line>Achieve more.</Line>
           </h1>
