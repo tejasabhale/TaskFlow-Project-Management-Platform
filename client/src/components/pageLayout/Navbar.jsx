@@ -45,6 +45,12 @@ const primaryButtonStyle = {
   color: "var(--text-inverse)",
 };
 
+/* Hover styles only on devices that really hover, so a tap never leaves a link looking active */
+const CAN_HOVER = "[@media(hover:hover)]";
+
+const FOCUSABLE =
+  'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"])';
+
 const isLinkActive = (pathname, to) =>
   to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`);
 
@@ -98,6 +104,7 @@ const Navbar = () => {
 
   const linkRefs = useRef({});
   const barRef = useRef(null);
+  const headerRef = useRef(null);
   const toggleRef = useRef(null);
   const menuRef = useRef(null);
   const wasOpen = useRef(false);
@@ -105,9 +112,10 @@ const Navbar = () => {
   const isAdmin = user?.role === "admin";
   const dashboardPath = isAdmin ? "/admin" : "/dashboard";
 
-  /* ---------- Close the menu on route change ---------- */
+  /* ---------- On route change: close the menu and clear any leftover hover/focus state ---------- */
   useEffect(() => {
     setMenuOpen(false);
+    setHovered(null);
   }, [location.pathname]);
 
   /* ---------- Scroll: condensed state + progress ---------- */
@@ -147,6 +155,7 @@ const Navbar = () => {
   }, [location.pathname]);
 
   /* ---------- Sliding indicator ---------- */
+  /* The open page is the only active link. On a page that is not in the nav (login, dashboard...) none is active. */
   const activeKey =
     NAV_LINKS.find((link) => isLinkActive(location.pathname, link.to))?.to ??
     null;
@@ -192,13 +201,19 @@ const Navbar = () => {
     const onKey = (event) => {
       if (event.key === "Escape") setMenuOpen(false);
 
-      if (event.key === "Tab" && menuOpen && menuRef.current) {
+      /* While the menu is open, Tab cycles through the visible header controls and the menu links */
+      if (
+        event.key === "Tab" &&
+        menuOpen &&
+        menuRef.current &&
+        headerRef.current
+      ) {
         const nodes = [
-          toggleRef.current,
-          ...menuRef.current.querySelectorAll(
-            "a[href], button:not([disabled])"
-          ),
-        ].filter(Boolean);
+          ...headerRef.current.querySelectorAll(FOCUSABLE),
+          ...menuRef.current.querySelectorAll(FOCUSABLE),
+        ].filter((el) => el.getClientRects().length > 0);
+
+        if (nodes.length === 0) return;
 
         const first = nodes[0];
         const last = nodes[nodes.length - 1];
@@ -222,7 +237,7 @@ const Navbar = () => {
     };
   }, [menuOpen]);
 
-  /* ---------- Scroll lock + focus management ---------- */
+  /* ---------- Immediate mobile scroll lock + focus management ---------- */
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -278,12 +293,13 @@ const Navbar = () => {
   };
 
   /*
-   * Nav link click: close the mobile menu and scroll to the top.
+   * Nav link click: close the mobile menu, drop the hover/focus highlight and scroll to the top.
    * - Different page: ScrollToTop jumps to the top when the route changes.
    * - Same page: the route does not change, so scroll to the top smoothly here.
    */
   const handleNavClick = (to) => () => {
     closeMenu();
+    setHovered(null);
 
     if (location.pathname === to) {
       scrollToTop({ smooth: true });
@@ -303,96 +319,119 @@ const Navbar = () => {
 
   return (
     <>
-      {/* Hide scrollbars while the mobile menu is open (page and menu stay scrollable/locked as before) */}
       <style>{`
+        @media (prefers-reduced-motion: reduce) {
+          .taskflow-nav,
+          .taskflow-nav * {
+            transition-duration: 0.01ms !important;
+            transition-delay: 0ms !important;
+          }
+        }
+
         html.mobile-menu-open,
         html.mobile-menu-open body {
           overflow: hidden !important;
+        }
+
+        html.mobile-menu-open {
           scrollbar-width: none !important;
-          scrollbar-gutter: auto !important;
           -ms-overflow-style: none !important;
         }
 
         html.mobile-menu-open::-webkit-scrollbar,
-        html.mobile-menu-open body::-webkit-scrollbar,
-        #mobile-menu::-webkit-scrollbar {
+        html.mobile-menu-open body::-webkit-scrollbar {
           display: none !important;
           width: 0 !important;
           height: 0 !important;
         }
 
-        #mobile-menu {
+        html.mobile-menu-open #mobile-menu {
           scrollbar-width: none !important;
           -ms-overflow-style: none !important;
+        }
+
+        html.mobile-menu-open #mobile-menu::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
         }
       `}</style>
 
       {/* ================= HEADER ================= */}
-      <header className="sticky top-0 z-50 h-16 w-full">
+      {/* Fixed (not sticky): the scroll lock can never move it out of view, so the cross stays visible */}
+      <header
+        ref={headerRef}
+        className={`taskflow-nav fixed inset-x-0 top-0 z-50 flex justify-center border-b transition-[padding,background-color,border-color,backdrop-filter] duration-500 ${EASE} ${scrolled ? "px-3 sm:px-6" : "px-0"
+          } ${scrolled || menuOpen
+            ? "border-transparent bg-transparent"
+            : "border-[var(--border)] bg-[var(--surface)]/80 backdrop-blur-md"
+          }`}
+        style={{
+          paddingTop: scrolled
+            ? "max(0.5rem, env(safe-area-inset-top, 0px))"
+            : "env(safe-area-inset-top, 0px)",
+        }}
+      >
         <div
-          className={`flex h-full justify-center border-b transition-[padding,background-color,border-color,backdrop-filter] duration-500 ${EASE} ${scrolled ? "px-3 pt-2 sm:px-6" : "px-0 pt-0"
-            } ${scrolled || menuOpen
-              ? "border-transparent bg-transparent"
-              : "border-[var(--border)] bg-[var(--surface)]/80 backdrop-blur-md"
+          className={`relative w-full overflow-hidden border transition-all duration-500 ${EASE} ${scrolled ? "max-w-6xl rounded-[2rem]" : "max-w-7xl rounded-none"
+            } ${menuOpen
+              ? "border-transparent bg-transparent shadow-none"
+              : scrolled
+                ? "border-[var(--border)] bg-[var(--surface)]/75 shadow-[var(--shadow-md)] backdrop-blur-xl"
+                : "border-transparent bg-transparent"
             }`}
         >
-          <div
-            className={`relative w-full overflow-hidden border transition-all duration-500 ${EASE} ${scrolled ? "max-w-6xl rounded-[2rem]" : "max-w-7xl rounded-none"
-              } ${menuOpen
-                ? "border-transparent bg-transparent shadow-none"
-                : scrolled
-                  ? "border-[var(--border)] bg-[var(--surface)]/75 shadow-[var(--shadow-md)] backdrop-blur-xl"
-                  : "border-transparent bg-transparent"
+          <nav
+            aria-label="Main navigation"
+            className={`grid grid-cols-[1fr_auto] items-center gap-3 transition-all duration-500 ${EASE} lg:grid-cols-[1fr_auto_1fr] ${scrolled
+              ? "h-14 pl-4 pr-2 sm:pl-5 sm:pr-2.5"
+              : "h-16 px-5 sm:px-8 lg:px-12"
               }`}
           >
-            <nav
-              aria-label="Main navigation"
-              className={`grid grid-cols-[1fr_auto] items-center gap-3 transition-all duration-500 ${EASE} lg:grid-cols-[1fr_auto_1fr] ${scrolled
-                  ? "h-14 pl-4 pr-2 sm:pl-5 sm:pr-2.5"
-                  : "h-16 px-5 sm:px-8 lg:px-12"
-                }`}
+            {/* Brand */}
+            <Link
+              to="/"
+              onClick={handleNavClick("/")}
+              aria-label="TaskFlow home"
+              style={{ color: "var(--text)" }}
+              className={`group flex min-w-0 items-center gap-2.5 justify-self-start rounded-full ${FOCUS}`}
             >
-              {/* Brand */}
-              <Link
-                to="/"
-                onClick={handleNavClick("/")}
-                aria-label="TaskFlow home"
-                style={{ color: "var(--text)" }}
-                className={`group flex min-w-0 items-center gap-2.5 justify-self-start rounded-full ${FOCUS}`}
-              >
-                <img
-                  src="/taskflow-logo.svg"
-                  alt=""
-                  aria-hidden="true"
-                  draggable="false"
-                  className={`w-auto shrink-0 select-none object-contain transition-all duration-500 ${EASE} group-hover:scale-105 ${scrolled ? "h-8" : "h-9"
-                    }`}
-                />
+              <img
+                src="/taskflow-logo.svg"
+                alt=""
+                aria-hidden="true"
+                draggable="false"
+                className={`w-auto shrink-0 select-none object-contain transition-all duration-500 ${EASE} group-hover:scale-105 ${scrolled ? "h-8" : "h-9"
+                  }`}
+              />
 
-                <span className="whitespace-nowrap text-lg font-extrabold tracking-tight sm:text-xl">
-                  Task<span className="text-[var(--primary)]">Flow</span>
-                </span>
-              </Link>
+              <span className="whitespace-nowrap text-lg font-extrabold tracking-tight sm:text-xl">
+                Task<span className="text-[var(--primary)]">Flow</span>
+              </span>
+            </Link>
 
-              {/* Desktop links with sliding indicator */}
-              <div
-                onMouseLeave={() => setHovered(null)}
-                className="relative hidden items-center lg:flex"
-              >
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 h-9 -translate-y-1/2 rounded-full bg-[var(--primary-soft)]"
-                  style={{
-                    left: indicator.left,
-                    width: indicator.width,
-                    opacity: indicator.show ? 1 : 0,
-                    transition: indicator.animate
-                      ? "left 500ms cubic-bezier(0.22,1,0.36,1), width 500ms cubic-bezier(0.22,1,0.36,1), opacity 300ms"
-                      : "opacity 300ms",
-                  }}
-                />
+            {/* Desktop links with sliding indicator */}
+            <div
+              onMouseLeave={() => setHovered(null)}
+              className="relative hidden items-center lg:flex"
+            >
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 h-9 -translate-y-1/2 rounded-full bg-[var(--primary-soft)]"
+                style={{
+                  left: indicator.left,
+                  width: indicator.width,
+                  opacity: indicator.show ? 1 : 0,
+                  transition: indicator.animate
+                    ? "left 500ms cubic-bezier(0.22,1,0.36,1), width 500ms cubic-bezier(0.22,1,0.36,1), opacity 300ms"
+                    : "opacity 300ms",
+                }}
+              />
 
-                {NAV_LINKS.map((link) => (
+              {NAV_LINKS.map((link) => {
+                const isActive = link.to === activeKey;
+
+                return (
                   <NavLink
                     key={link.to}
                     ref={(el) => {
@@ -401,116 +440,151 @@ const Navbar = () => {
                     to={link.to}
                     end={link.to === "/"}
                     onClick={handleNavClick(link.to)}
-                    onMouseEnter={() => setHovered(link.to)}
-                    onFocus={() => setHovered(link.to)}
+                    /* only a real mouse moves the highlight, touch taps never leave it behind */
+                    onPointerEnter={(event) => {
+                      if (event.pointerType === "mouse") setHovered(link.to);
+                    }}
+                    /* keyboard focus moves it too, but a click's focus does not */
+                    onFocus={(event) => {
+                      if (event.currentTarget.matches(":focus-visible")) setHovered(link.to);
+                    }}
                     onBlur={() => setHovered(null)}
-                    style={({ isActive }) => ({
-                      color: isActive
-                        ? "var(--primary-text)"
-                        : "var(--text-muted)",
-                    })}
-                    className={`relative flex h-9 items-center rounded-full px-4 text-sm font-medium tracking-tight transition-colors duration-300 hover:!text-[var(--text)] ${FOCUS}`}
+                    aria-current={isActive ? "page" : undefined}
+                    style={{
+                      color: isActive ? "var(--primary-text)" : "var(--text-muted)",
+                    }}
+                    className={`relative flex h-9 items-center rounded-full px-4 text-sm font-medium tracking-tight transition-colors duration-300 ${isActive ? "" : `${CAN_HOVER}:hover:!text-[var(--text)]`
+                      } ${FOCUS}`}
                   >
                     {link.label}
                   </NavLink>
+                );
+              })}
+            </div>
+
+            {/* Right side */}
+            <div className="flex shrink-0 items-center gap-1.5 justify-self-end sm:gap-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={`Switch to ${isDark ? "light" : "dark"} theme`}
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--surface-muted)] hover:text-[var(--text)] ${FOCUS}`}
+              >
+                {isDark ? <Sun size={17} /> : <Moon size={17} />}
+              </button>
+
+              {!loading &&
+                (isAuthenticated ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className={`hidden h-10 items-center gap-1.5 rounded-full border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-muted)] transition-colors duration-200 hover:border-[var(--danger)]/30 hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] lg:inline-flex ${FOCUS}`}
+                    >
+                      <LogOut size={15} />
+                      Log out
+                    </button>
+
+                    <RollLink to={dashboardPath} onClick={closeMenu}>
+                      {isAdmin ? "Admin dashboard" : "Dashboard"}
+                    </RollLink>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/login"
+                      style={{ color: "var(--text)" }}
+                      className={`hidden h-10 items-center rounded-full px-4 text-sm font-medium transition-colors duration-200 hover:bg-[var(--surface-muted)] lg:inline-flex ${FOCUS}`}
+                    >
+                      Log in
+                    </Link>
+
+                    <RollLink to="/register" onClick={closeMenu}>
+                      Get started
+                    </RollLink>
+                  </>
                 ))}
-              </div>
 
-              {/* Right side */}
-              <div className="flex shrink-0 items-center gap-1.5 justify-self-end sm:gap-2">
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  aria-label={`Switch to ${isDark ? "light" : "dark"} theme`}
-                  className={`flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--surface-muted)] hover:text-[var(--text)] ${FOCUS}`}
+              {/* Mobile toggle: the hamburger morphs into a cross (and back) */}
+              <button
+                ref={toggleRef}
+                type="button"
+                onClick={toggleMenu}
+                aria-expanded={menuOpen}
+                aria-controls="mobile-menu"
+                aria-label={menuOpen ? "Close menu" : "Open menu"}
+                style={{ color: "var(--text)" }}
+                className={`relative h-11 w-11 shrink-0 rounded-full border transition-colors duration-500 lg:hidden ${FOCUS} ${menuOpen
+                  ? "border-[var(--primary)] bg-[var(--surface)]"
+                  : `border-[var(--border-strong)] bg-transparent ${CAN_HOVER}:hover:bg-[var(--surface-muted)]`
+                  }`}
+              >
+                {/* the three lines turn together, so the change reads as one smooth motion */}
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-0 transition-transform duration-500 ${EASE}`}
+                  style={{ transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)" }}
                 >
-                  {isDark ? <Sun size={17} /> : <Moon size={17} />}
-                </button>
-
-                {!loading &&
-                  (isAuthenticated ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className={`hidden h-10 items-center gap-1.5 rounded-full border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-muted)] transition-colors duration-200 hover:border-[var(--danger)]/30 hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] lg:inline-flex ${FOCUS}`}
-                      >
-                        <LogOut size={15} />
-                        Log out
-                      </button>
-
-                      <RollLink to={dashboardPath} onClick={closeMenu}>
-                        {isAdmin ? "Admin dashboard" : "Dashboard"}
-                      </RollLink>
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        to="/login"
-                        style={{ color: "var(--text)" }}
-                        className={`hidden h-10 items-center rounded-full px-4 text-sm font-medium transition-colors duration-200 hover:bg-[var(--surface-muted)] lg:inline-flex ${FOCUS}`}
-                      >
-                        Log in
-                      </Link>
-
-                      <RollLink to="/register" onClick={closeMenu}>
-                        Get started
-                      </RollLink>
-                    </>
-                  ))}
-
-                {/* Mobile toggle */}
-                <button
-                  ref={toggleRef}
-                  type="button"
-                  onClick={toggleMenu}
-                  aria-expanded={menuOpen}
-                  aria-controls="mobile-menu"
-                  aria-label={menuOpen ? "Close menu" : "Open menu"}
-                  className={`relative h-10 w-10 shrink-0 rounded-full border transition-colors duration-500 lg:hidden ${FOCUS} ${menuOpen
-                      ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary-text)]"
-                      : "border-[var(--border-strong)] text-[var(--text)]"
-                    }`}
-                >
+                  {/* top line: slides to the centre, then becomes one arm of the cross */}
                   <span
-                    className={`absolute left-1/2 top-1/2 block h-[1.5px] w-5 bg-current transition-transform duration-500 ${EASE}`}
+                    className={`absolute left-1/2 top-1/2 block h-[1.5px] w-5 rounded-full bg-current transition-transform duration-500 ${EASE}`}
                     style={{
                       transform: menuOpen
-                        ? "translate(-50%, 0) rotate(45deg)"
-                        : "translate(-50%, -4px) rotate(0deg)",
+                        ? "translate(-50%, -50%) rotate(45deg)"
+                        : "translate(-50%, calc(-50% - 6px)) rotate(0deg)",
                     }}
                   />
+
+                  {/* middle line: shrinks away and fades */}
                   <span
-                    className={`absolute left-1/2 top-1/2 block h-[1.5px] w-5 bg-current transition-transform duration-500 ${EASE}`}
+                    className={`absolute left-1/2 top-1/2 block h-[1.5px] w-5 rounded-full bg-current transition-[transform,opacity] duration-300 ${EASE}`}
                     style={{
                       transform: menuOpen
-                        ? "translate(-50%, 0) rotate(-45deg)"
-                        : "translate(-50%, 4px) rotate(0deg)",
+                        ? "translate(-50%, -50%) scaleX(0)"
+                        : "translate(-50%, -50%) scaleX(1)",
+                      opacity: menuOpen ? 0 : 1,
                     }}
                   />
-                </button>
-              </div>
-            </nav>
 
-            {/* Scroll progress */}
-            <span
-              ref={barRef}
-              aria-hidden="true"
-              className={`absolute bottom-0 left-0 h-[2px] w-full origin-left bg-[var(--primary)] transition-opacity duration-300 ${menuOpen ? "opacity-0" : "opacity-100"
-                }`}
-              style={{ transform: "scaleX(0)" }}
-            />
-          </div>
+                  {/* bottom line: slides to the centre, then becomes the other arm */}
+                  <span
+                    className={`absolute left-1/2 top-1/2 block h-[1.5px] w-5 rounded-full bg-current transition-transform duration-500 ${EASE}`}
+                    style={{
+                      transform: menuOpen
+                        ? "translate(-50%, -50%) rotate(-45deg)"
+                        : "translate(-50%, calc(-50% + 6px)) rotate(0deg)",
+                    }}
+                  />
+                </span>
+              </button>
+            </div>
+          </nav>
+
+          {/* Scroll progress */}
+          <span
+            ref={barRef}
+            aria-hidden="true"
+            className={`absolute bottom-0 left-0 h-[2px] w-full origin-left bg-[var(--primary)] transition-opacity duration-300 ${menuOpen ? "opacity-0" : "opacity-100"
+              }`}
+            style={{ transform: "scaleX(0)" }}
+          />
         </div>
       </header>
 
-      {/* ================= MOBILE MENU ================= */}
+      {/* Takes the space the old sticky header used, so page content still starts below the navbar */}
+      <div
+        aria-hidden="true"
+        className="w-full"
+        style={{ height: "calc(4rem + env(safe-area-inset-top, 0px))" }}
+      />
+
+      {/* ================= MOBILE MENU (follows the theme) ================= */}
       <div
         ref={menuRef}
         id="mobile-menu"
         data-lenis-prevent
         aria-hidden={!menuOpen}
-        className={`fixed inset-0 z-40 flex flex-col overflow-y-auto overscroll-contain bg-[var(--background)] text-[var(--text)] transition-[clip-path,visibility] duration-700 ${EASE} lg:hidden ${menuOpen ? "visible" : "invisible"
+        className={`taskflow-nav fixed inset-0 z-40 flex flex-col overflow-y-auto overscroll-contain bg-[var(--background)] text-[var(--text)] transition-[clip-path,visibility] duration-700 ${EASE} lg:hidden ${menuOpen ? "visible" : "invisible"
           }`}
         style={{
           clipPath: menuOpen
@@ -530,7 +604,7 @@ const Navbar = () => {
 
         <nav
           aria-label="Mobile navigation"
-          className="relative mx-auto flex w-full max-w-2xl flex-1 flex-col items-stretch justify-center gap-1 px-6 pb-4 pt-24 text-center sm:px-10"
+          className="relative mx-auto flex w-full max-w-2xl flex-1 flex-col items-stretch justify-center gap-1 px-6 pb-4 pt-[calc(6rem+env(safe-area-inset-top,0px))] text-center sm:px-10"
         >
           {NAV_LINKS.map((link, i) => {
             const isActive = activeKey === link.to;
@@ -547,20 +621,21 @@ const Navbar = () => {
                   color: isActive ? "var(--primary-text)" : "var(--text)",
                   transitionDelay: menuOpen ? `${280 + i * 70}ms` : "0ms",
                 }}
-                className={`group flex items-center justify-center gap-3 border-b border-[var(--border)] py-3.5 text-3xl font-bold tracking-tight transition-all duration-700 sm:py-4 sm:text-4xl ${EASE} hover:!text-[var(--primary-text)] focus-visible:!text-[var(--primary-text)] focus-visible:outline-none ${menuOpen
-                    ? "translate-y-0 opacity-100"
-                    : "translate-y-10 opacity-0"
+                className={`group flex items-center justify-center gap-3 border-b border-[var(--border)] py-3.5 text-3xl font-bold tracking-tight transition-all duration-700 sm:py-4 sm:text-4xl ${EASE} ${CAN_HOVER}:hover:!text-[var(--primary-text)] focus-visible:!text-[var(--primary-text)] focus-visible:outline-none ${menuOpen
+                  ? "translate-y-0 opacity-100"
+                  : "translate-y-10 opacity-0"
                   }`}
               >
                 <span aria-hidden="true" className="h-2 w-2 shrink-0" />
 
                 <span>{link.label}</span>
 
+                {/* dot: always on for the open page; hover/focus preview only on devices that can hover */}
                 <span
                   aria-hidden="true"
                   className={`h-2 w-2 shrink-0 rounded-full bg-[var(--primary)] transition-transform duration-300 ${isActive
-                      ? "scale-100"
-                      : "scale-0 group-hover:scale-100 group-focus-visible:scale-100"
+                    ? "scale-100"
+                    : `scale-0 ${CAN_HOVER}:group-hover:scale-100 group-focus-visible:scale-100`
                     }`}
                 />
               </NavLink>

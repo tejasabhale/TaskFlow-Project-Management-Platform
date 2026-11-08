@@ -23,6 +23,10 @@ const FRAMES = [
     [2, 2, 2],
 ];
 
+const LAST_FRAME = FRAMES.length - 1;
+
+const INITIAL_DELAY_MS = 1900; // let the page-load animation finish first
+const RESUME_DELAY_MS = 400; // short beat after scrolling back into view
 const STEP_MS = 1400; // time between forward moves
 const HOLD_MS = 1500; // pause on the finished board
 const REVERSE_MS = 1000; // duration of the reverse (reset) glide
@@ -31,15 +35,8 @@ const REVERSE_STAGGER = 0.1; // seconds between each card starting its way back
 const FORWARD = { duration: 0.9, ease: [0.4, 0, 0.2, 1] }; // smooth in-out, no bounce
 const REVERSE = { duration: REVERSE_MS / 1000, ease: [0.4, 0, 0.2, 1] };
 
-const REST = { scale: 1, boxShadow: "0 0 0 rgba(0,0,0,0)" };
-const LIFT = {
-    scale: [1, 1.035, 1],
-    boxShadow: [
-        "0 0 0 rgba(0,0,0,0)",
-        "0 10px 24px rgba(0,0,0,0.12)",
-        "0 0 0 rgba(0,0,0,0)",
-    ],
-};
+const REST = { scale: 1 };
+const LIFT = { scale: [1, 1.035, 1] };
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -49,18 +46,59 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * When everything is done, all cards glide back to their original positions
  * (reverse animation), then the loop starts again.
  *
+ * The loop only runs while the board is on screen and the tab is visible.
+ * When it leaves the viewport it pauses, and it resumes from the same frame.
+ *
+ * Columns do not clip their content and a moving card sits above everything
+ * else, so the full movement between columns is always visible.
+ *
  * Size is constant: every card has the same fixed height and every column has one
  * fixed height that fits all three cards, so the board never grows or shrinks.
  */
 export default function HeroBoard() {
     const reduce = usePrefersReducedMotion();
+    const rootRef = useRef(null);
     const [frame, setFrame] = useState(reduce ? 3 : 0);
     const [moved, setMoved] = useState([]); // indexes of tasks that changed column
     const [reversing, setReversing] = useState(false);
-    const frameRef = useRef(frame);
+    const [inView, setInView] = useState(false);
+    const [tabVisible, setTabVisible] = useState(true);
 
+    const frameRef = useRef(frame);
+    const hasStarted = useRef(false);
+
+    // Is the board on screen?
     useEffect(() => {
-        if (reduce) return undefined;
+        const node = rootRef.current;
+        if (!node) return undefined;
+
+        if (typeof IntersectionObserver === "undefined") {
+            setInView(true);
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver(
+            ([entry]) => setInView(entry.isIntersecting),
+            { threshold: 0.25 }
+        );
+        observer.observe(node);
+
+        return () => observer.disconnect();
+    }, []);
+
+    // Is the browser tab visible?
+    useEffect(() => {
+        const onChange = () => setTabVisible(!document.hidden);
+        onChange();
+        document.addEventListener("visibilitychange", onChange);
+        return () => document.removeEventListener("visibilitychange", onChange);
+    }, []);
+
+    const running = inView && tabVisible;
+
+    // The loop. Cleanup cancels it, and the next run picks up from frameRef.
+    useEffect(() => {
+        if (reduce || !running) return undefined;
 
         let cancelled = false;
 
@@ -74,35 +112,36 @@ export default function HeroBoard() {
         };
 
         (async () => {
-            await wait(1900); // let the page-load animation finish first
+            await wait(hasStarted.current ? RESUME_DELAY_MS : INITIAL_DELAY_MS);
+            hasStarted.current = true;
 
             while (!cancelled) {
-                // forward: one task at a time
-                for (let i = 1; i < FRAMES.length; i += 1) {
-                    goTo(i, false);
+                if (frameRef.current < LAST_FRAME) {
+                    // forward: one task at a time
+                    goTo(frameRef.current + 1, false);
                     await wait(STEP_MS);
+                } else {
+                    // hold the finished board, then every card glides back to To do
+                    await wait(HOLD_MS);
                     if (cancelled) return;
+
+                    goTo(0, true);
+                    await wait(REVERSE_MS + REVERSE_STAGGER * 1000 * (TASKS.length - 1) + 900);
                 }
-
-                await wait(HOLD_MS); // hold the finished board
-                if (cancelled) return;
-
-                // reverse: every card glides back to To do
-                goTo(0, true);
-                await wait(REVERSE_MS + REVERSE_STAGGER * 1000 * (TASKS.length - 1) + 900);
             }
         })();
 
         return () => {
             cancelled = true;
         };
-    }, [reduce]);
+    }, [reduce, running]);
 
     const placement = FRAMES[frame];
     const doneCount = placement.filter((col) => col === 2).length;
 
     return (
         <div
+            ref={rootRef}
             data-hero-board
             className="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
             role="img"
@@ -125,7 +164,7 @@ export default function HeroBoard() {
                 <span className="shrink-0 text-xs text-[var(--text-muted)]">Sample</span>
             </div>
 
-            {/* columns */}
+            {/* columns (no overflow clipping, so cards are visible all the way between columns) */}
             <div className="grid grid-cols-3 gap-2.5 p-4 sm:gap-3 sm:p-5">
                 {COLUMNS.map((name, columnIndex) => {
                     const cards = TASKS.filter((_, i) => placement[i] === columnIndex);
@@ -133,7 +172,7 @@ export default function HeroBoard() {
                     return (
                         <div
                             key={name}
-                            className="h-[20.5rem] overflow-hidden rounded-xl bg-[var(--background)] p-2.5 sm:p-3"
+                            className="h-[20.5rem] rounded-xl bg-[var(--background)] p-2.5 sm:p-3"
                         >
                             <div className="mb-3 flex h-4 items-center justify-between px-0.5">
                                 <div className="flex items-center gap-1.5">
@@ -176,11 +215,9 @@ export default function HeroBoard() {
                                                 scale: reversing
                                                     ? { ...REVERSE, delay: reverseDelay }
                                                     : FORWARD,
-                                                boxShadow: reversing
-                                                    ? { ...REVERSE, delay: reverseDelay }
-                                                    : FORWARD,
                                             }}
-                                            style={{ zIndex: moving ? 10 : 0 }}
+                                            // moving cards render in front of every column and card
+                                            style={{ zIndex: moving ? 50 : 1 }}
                                             className="relative flex h-[5.25rem] flex-col justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3"
                                         >
                                             <p
