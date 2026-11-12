@@ -63,8 +63,8 @@ const footerLinks = {
     { label: "Features", to: "/#features" },
     { label: "Dashboard", to: "/dashboard" },
     { label: "Tasks", to: "/dashboard/tasks" },
-    { label: "Projects", to: "dashboard/projects" },
-    { label: "Members", to: "dashboard/members" },
+    { label: "Projects", to: "/dashboard/projects" },
+    { label: "Members", to: "/dashboard/members" },
   ],
   Company: [
     { label: "About", to: "/about" },
@@ -214,7 +214,7 @@ export default function Footer() {
   return (
     <footer
       ref={footerRef}
-      className="relative mt-auto w-full border-t border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]"
+      className="footer-dark relative mt-auto w-full border-t border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]"
     >
       {/* Main footer: full width, no outer margin */}
       <div className="grid w-full grid-cols-2 gap-2.5 p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-3 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
@@ -340,7 +340,7 @@ export default function Footer() {
         <button
           type="button"
           onClick={scrollToTop}
-          className="group inline-flex min-h-9 shrink-0 items-center gap-2 self-start rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-xs font-bold text-[var(--text-muted)] transition-colors duration-200 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)] sm:self-auto"
+          className="group inline-flex min-h-9 shrink-0 items-center gap-2 self-start rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-xs font-bold text-[var(--text-muted)] transition-colors duration-200 hover:border-[var(--primary)] hover:text-[var(--primary)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)] sm:self-auto"
         >
           Back to top
 

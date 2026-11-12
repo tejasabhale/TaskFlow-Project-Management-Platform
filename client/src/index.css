@@ -6,6 +6,8 @@
 
 @import "tailwindcss";
 
+@import "./css/theme-transition.css";
+
 /*
  * Make Manrope Tailwind's default sans-serif font.
  * This also fixes elements using Tailwind's `font-sans` utility,
@@ -134,6 +136,44 @@
 
   /* Overlay */
   --overlay: rgba(0, 0, 0, 0.65);
+}
+
+/* ================================
+   Always-dark Footer
+   Re-declares the dark tokens on the footer only, so it
+   stays dark in both light and dark mode.
+================================ */
+
+.footer-dark {
+  color-scheme: dark;
+
+  /* Brand */
+  --brand: #fb923c;
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-active: #f97316;
+  --primary-soft: #3a1f0d;
+  --primary-text: #fdba74;
+
+  /* Layout */
+  --background: #0c0a09;
+  --surface: #171412;
+  --surface-muted: #211d1a;
+  --surface-elevated: #2a2522;
+
+  /* Text */
+  --text: #fafaf9;
+  --text-muted: #d6d3d1;
+  --text-subtle: #a8a29e;
+  --text-inverse: #1c0f05;
+
+  /* Borders */
+  --border: #2e2925;
+  --border-strong: #44403c;
+
+  /* Interaction */
+  --focus: #fb923c;
+  --selection: #7c2d12;
 }
 
 /* ================================

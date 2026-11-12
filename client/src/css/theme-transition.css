@@ -1,0 +1,124 @@
+/* ==========================================
+   TASKFLOW — FEATHERED CIRCLE REVEAL
+   Both directions (light → dark and dark → light) use the same animation:
+   the incoming theme grows out of the toggle through a soft, blurred
+   circular edge.
+   Needs --theme-origin-x / --theme-origin-y set by ThemeProvider.
+========================================== */
+
+/* Animatable radius of the reveal circle */
+@property --theme-reveal-radius {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+html {
+  view-transition-name: root;
+
+  /* Width of the soft edge. Raise for a dreamier blur, lower for a crisper one. */
+  --theme-feather: clamp(90px, 16vmin, 200px);
+}
+
+::view-transition-group(root) {
+  animation-duration: 800ms;
+}
+
+::view-transition-image-pair(root) {
+  isolation: isolate;
+}
+
+/* Remove the default plus-lighter blend (prevents brightness flash) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+
+/* Radius 0 -> bigger than the farthest screen corner (150vmax) plus the
+   feather, so the screen is always fully covered. */
+@keyframes taskflow-feather-reveal {
+  from {
+    --theme-reveal-radius: 0px;
+  }
+
+  to {
+    --theme-reveal-radius: calc(150vmax + var(--theme-feather));
+  }
+}
+
+/* ==========================================
+   REVEAL (applies to both theme directions)
+   Old layer stays underneath; the new layer is masked by the growing
+   feathered circle.
+========================================== */
+
+::view-transition-old(root) {
+  animation: none;
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
+
+  -webkit-mask-image: radial-gradient(
+    circle at var(--theme-origin-x, 50vw) var(--theme-origin-y, 50vh),
+    #000 calc(var(--theme-reveal-radius) - var(--theme-feather)),
+    transparent var(--theme-reveal-radius)
+  );
+  mask-image: radial-gradient(
+    circle at var(--theme-origin-x, 50vw) var(--theme-origin-y, 50vh),
+    #000 calc(var(--theme-reveal-radius) - var(--theme-feather)),
+    transparent var(--theme-reveal-radius)
+  );
+
+  animation: taskflow-feather-reveal 800ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+/* ==========================================
+   SUN / MOON ICON ANIMATION
+========================================== */
+
+.theme-toggle-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+.theme-toggle-symbol {
+  grid-area: 1 / 1;
+  display: block;
+  max-width: none;
+
+  transition:
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease;
+}
+
+.theme-toggle-symbol.is-active {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+.theme-toggle-symbol.is-inactive {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.55);
+  pointer-events: none;
+}
+
+/* ==========================================
+   ACCESSIBILITY
+========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+
+  .theme-toggle-symbol {
+    transition: none !important;
+  }
+}

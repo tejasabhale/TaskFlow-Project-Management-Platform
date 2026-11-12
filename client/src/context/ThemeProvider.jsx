@@ -1,36 +1,32 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 import ThemeContext from "./ThemeContext.jsx";
 
 const THEME_STORAGE_KEY = "theme";
 const VALID_PREFERENCES = new Set(["light", "dark", "system"]);
 
-/**
- * Safely retrieve stored preference from localStorage.
- * Defaults to "system" when unconfigured or invalid.
- */
 function getStoredPreference() {
   if (typeof window === "undefined") return "system";
 
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
+
     if (stored && VALID_PREFERENCES.has(stored)) {
       return stored;
     }
   } catch {
-    // localStorage might be unavailable in sandboxed environments or private browsing
+    // localStorage may be unavailable.
   }
 
   return "system";
 }
 
-/**
- * Check if the host OS/browser currently prefers dark mode.
- */
 function getSystemTheme() {
   if (typeof window === "undefined") return "light";
 
@@ -43,9 +39,6 @@ function getSystemTheme() {
   }
 }
 
-/**
- * Apply the resolved theme to the <html> root element.
- */
 function applyThemeToDOM(resolvedTheme) {
   if (typeof document === "undefined") return;
 
@@ -57,22 +50,25 @@ function applyThemeToDOM(resolvedTheme) {
 }
 
 export function ThemeProvider({ children }) {
-  const [themePreference, setThemePreferenceState] = useState(getStoredPreference);
+  const [themePreference, setThemePreferenceState] = useState(
+    getStoredPreference,
+  );
+
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
 
-  // Compute the resolved active theme
   const resolvedTheme = useMemo(() => {
     if (themePreference === "light") return "light";
     if (themePreference === "dark") return "dark";
+
     return systemTheme;
   }, [themePreference, systemTheme]);
 
-  // Apply to DOM whenever resolved theme changes
-  useEffect(() => {
+  // Apply the theme before the browser paints the updated UI.
+  useLayoutEffect(() => {
     applyThemeToDOM(resolvedTheme);
   }, [resolvedTheme]);
 
-  // Listen to OS system color scheme changes
+  // Listen to operating system theme changes.
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
@@ -97,26 +93,30 @@ export function ThemeProvider({ children }) {
     };
   }, []);
 
-  // Listen to storage events to synchronize across browser tabs
+  // Synchronize theme preferences across browser tabs.
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
     const handleStorage = (event) => {
-      if (event.key === THEME_STORAGE_KEY) {
-        const nextPref = event.newValue;
-        if (nextPref && VALID_PREFERENCES.has(nextPref)) {
-          setThemePreferenceState(nextPref);
-        } else if (!nextPref) {
-          setThemePreferenceState("system");
-        }
+      if (event.key !== THEME_STORAGE_KEY) return;
+
+      const nextPref = event.newValue;
+
+      if (nextPref && VALID_PREFERENCES.has(nextPref)) {
+        setThemePreferenceState(nextPref);
+      } else if (!nextPref) {
+        setThemePreferenceState("system");
       }
     };
 
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
-  // Set explicit preference ("light", "dark", or "system")
+  // Set an explicit theme preference.
   const setThemePreference = useCallback((nextPref) => {
     if (!VALID_PREFERENCES.has(nextPref)) return;
 
@@ -125,14 +125,76 @@ export function ThemeProvider({ children }) {
     try {
       localStorage.setItem(THEME_STORAGE_KEY, nextPref);
     } catch {
-      // Ignore storage write errors (e.g. quota or security policy)
+      // Ignore storage errors.
     }
   }, []);
 
-  // Simple toggle between light and dark
-  const toggleTheme = useCallback(() => {
-    setThemePreference(resolvedTheme === "dark" ? "light" : "dark");
-  }, [resolvedTheme, setThemePreference]);
+  // Animated theme toggle using the View Transition API.
+  // `origin` is { x, y } in viewport px (usually the toggle button's center).
+  const toggleTheme = useCallback(
+    (origin) => {
+      if (typeof document === "undefined") return;
+
+      const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
+      const root = document.documentElement;
+
+      const prefersReducedMotion =
+        window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ??
+        false;
+
+      const canAnimate =
+        typeof document.startViewTransition === "function" &&
+        !prefersReducedMotion;
+
+      const updateTheme = () => {
+        flushSync(() => {
+          setThemePreferenceState(nextTheme);
+          applyThemeToDOM(nextTheme);
+        });
+
+        try {
+          localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+        } catch {
+          // Ignore storage errors.
+        }
+      };
+
+      // Fallback for unsupported browsers or reduced-motion settings.
+      if (!canAnimate) {
+        updateTheme();
+        return;
+      }
+
+      // Circular reveal origin.
+      if (Number.isFinite(origin?.x) && Number.isFinite(origin?.y)) {
+        root.style.setProperty("--theme-origin-x", `${origin.x}px`);
+        root.style.setProperty("--theme-origin-y", `${origin.y}px`);
+      } else {
+        root.style.setProperty("--theme-origin-x", "50vw");
+        root.style.setProperty("--theme-origin-y", "50vh");
+      }
+
+      // Direction flag read by the CSS (dark → light = reversed animation).
+      root.dataset.themeTransition =
+        nextTheme === "light" ? "dark-to-light" : "light-to-dark";
+
+      const cleanup = () => {
+        root.style.removeProperty("--theme-origin-x");
+        root.style.removeProperty("--theme-origin-y");
+        delete root.dataset.themeTransition;
+      };
+
+      try {
+        const transition = document.startViewTransition(updateTheme);
+
+        transition.finished.then(cleanup, cleanup);
+      } catch {
+        cleanup();
+        updateTheme();
+      }
+    },
+    [resolvedTheme],
+  );
 
   const value = useMemo(
     () => ({

@@ -51,6 +51,9 @@ const CAN_HOVER = "[@media(hover:hover)]";
 const FOCUSABLE =
   'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"])';
 
+/* Last pill position, kept outside the component: if the navbar remounts on a page change, the pill starts where it was */
+const persistedIndicator = { left: 0, width: 0, key: null };
+
 const isLinkActive = (pathname, to) =>
   to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`);
 
@@ -88,13 +91,14 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
+  const [pendingKey, setPendingKey] = useState(null); // link clicked, route not changed yet
   const [wipeOrigin, setWipeOrigin] = useState("calc(100% - 40px) 40px");
-  const [indicator, setIndicator] = useState({
-    left: 0,
-    width: 0,
-    show: false,
+  const [indicator, setIndicator] = useState(() => ({
+    left: persistedIndicator.left,
+    width: persistedIndicator.width,
+    show: persistedIndicator.key !== null,
     animate: false,
-  });
+  }));
 
   const { isDark, toggleTheme } = useTheme();
   const { user, isAuthenticated, loading, logout } = useAuth();
@@ -103,19 +107,22 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const linkRefs = useRef({});
+  const linksWrapRef = useRef(null);
   const barRef = useRef(null);
   const headerRef = useRef(null);
   const toggleRef = useRef(null);
   const menuRef = useRef(null);
   const wasOpen = useRef(false);
+  const lastKeyRef = useRef(persistedIndicator.key);
 
   const isAdmin = user?.role === "admin";
   const dashboardPath = isAdmin ? "/admin" : "/dashboard";
 
-  /* ---------- On route change: close the menu and clear any leftover hover/focus state ---------- */
+  /* ---------- On route change: close the menu and clear any leftover hover/focus/pending state ---------- */
   useEffect(() => {
     setMenuOpen(false);
     setHovered(null);
+    setPendingKey(null);
   }, [location.pathname]);
 
   /* ---------- Scroll: condensed state + progress ---------- */
@@ -160,27 +167,58 @@ const Navbar = () => {
     NAV_LINKS.find((link) => isLinkActive(location.pathname, link.to))?.to ??
     null;
 
-  const targetKey = hovered ?? activeKey;
+  /* What the UI shows as active: the clicked link right away, then the real page */
+  const displayKey = pendingKey ?? activeKey;
+
+  /*
+   * While a clicked page is loading, the pill is locked to the clicked link:
+   * the mouse crossing other links on its way out cannot pull it away.
+   * Otherwise it follows hover first, then the open page.
+   */
+  const targetKey = pendingKey ?? hovered ?? activeKey;
+
+  /* Safety: if the navigation never lands (blocked or cancelled), release the lock */
+  useEffect(() => {
+    if (!pendingKey) return undefined;
+
+    const timer = setTimeout(() => setPendingKey(null), 2500);
+    return () => clearTimeout(timer);
+  }, [pendingKey]);
 
   const measure = useCallback(() => {
     const el = targetKey ? linkRefs.current[targetKey] : null;
 
     if (!el || el.offsetWidth === 0) {
-      setIndicator((prev) => ({ ...prev, show: false }));
+      lastKeyRef.current = null;
+      setIndicator((prev) => (prev.show ? { ...prev, show: false } : prev));
       return;
     }
 
-    setIndicator((prev) => ({
-      left: el.offsetLeft,
-      width: el.offsetWidth,
-      show: true,
-      animate: prev.show,
-    }));
+    /* Slide only when the target link changed, not on resize or font load */
+    const keyChanged = lastKeyRef.current !== targetKey;
+    lastKeyRef.current = targetKey;
+
+    persistedIndicator.left = el.offsetLeft;
+    persistedIndicator.width = el.offsetWidth;
+    persistedIndicator.key = targetKey;
+
+    setIndicator((prev) => {
+      if (prev.show && prev.left === el.offsetLeft && prev.width === el.offsetWidth) {
+        return prev;
+      }
+
+      return {
+        left: el.offsetLeft,
+        width: el.offsetWidth,
+        show: true,
+        animate: prev.show && keyChanged,
+      };
+    });
   }, [targetKey]);
 
   useLayoutEffect(() => {
     measure();
-  }, [measure, scrolled]);
+  }, [measure]);
 
   useEffect(() => {
     window.addEventListener("resize", measure);
@@ -189,7 +227,18 @@ const Navbar = () => {
       document.fonts.ready.then(measure);
     }
 
-    return () => window.removeEventListener("resize", measure);
+    /* Re-measure whenever the links change size (fonts loading, breakpoint changes) */
+    let observer;
+
+    if (typeof ResizeObserver !== "undefined" && linksWrapRef.current) {
+      observer = new ResizeObserver(measure);
+      observer.observe(linksWrapRef.current);
+    }
+
+    return () => {
+      window.removeEventListener("resize", measure);
+      observer?.disconnect();
+    };
   }, [measure]);
 
   /* ---------- Mobile menu: resize, Escape and focus trap ---------- */
@@ -293,16 +342,21 @@ const Navbar = () => {
   };
 
   /*
-   * Nav link click: close the mobile menu, drop the hover/focus highlight and scroll to the top.
-   * - Different page: ScrollToTop jumps to the top when the route changes.
+   * Nav link click: close the mobile menu and scroll to the top when needed.
+   * - Different page: pendingKey moves the pill and the text colour to the clicked
+   *   link straight away. It stays until the route has changed (the pathname effect
+   *   then clears it), so the pill never slides back to the old page's link while
+   *   the new route is still loading. ScrollToTop jumps to the top on route change.
    * - Same page: the route does not change, so scroll to the top smoothly here.
    */
   const handleNavClick = (to) => () => {
     closeMenu();
-    setHovered(null);
 
     if (location.pathname === to) {
+      setPendingKey(null);
       scrollToTop({ smooth: true });
+    } else {
+      setPendingKey(to);
     }
   };
 
@@ -412,6 +466,7 @@ const Navbar = () => {
 
             {/* Desktop links with sliding indicator */}
             <div
+              ref={linksWrapRef}
               onMouseLeave={() => setHovered(null)}
               className="relative hidden items-center lg:flex"
             >
@@ -429,7 +484,7 @@ const Navbar = () => {
               />
 
               {NAV_LINKS.map((link) => {
-                const isActive = link.to === activeKey;
+                const isActive = link.to === displayKey;
 
                 return (
                   <NavLink
@@ -448,8 +503,11 @@ const Navbar = () => {
                     onFocus={(event) => {
                       if (event.currentTarget.matches(":focus-visible")) setHovered(link.to);
                     }}
-                    onBlur={() => setHovered(null)}
-                    aria-current={isActive ? "page" : undefined}
+                    /* only clear the hover that belongs to this link: pressing another link blurs this one first */
+                    onBlur={() =>
+                      setHovered((current) => (current === link.to ? null : current))
+                    }
+                    aria-current={link.to === activeKey ? "page" : undefined}
                     style={{
                       color: isActive ? "var(--primary-text)" : "var(--text-muted)",
                     }}
@@ -466,11 +524,30 @@ const Navbar = () => {
             <div className="flex shrink-0 items-center gap-1.5 justify-self-end sm:gap-2">
               <button
                 type="button"
-                onClick={toggleTheme}
+                onClick={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+
+                  toggleTheme({
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2,
+                  });
+                }}
                 aria-label={`Switch to ${isDark ? "light" : "dark"} theme`}
                 className={`flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-200 hover:bg-[var(--surface-muted)] hover:text-[var(--text)] ${FOCUS}`}
               >
-                {isDark ? <Sun size={17} /> : <Moon size={17} />}
+                <span className="theme-toggle-icon" aria-hidden="true">
+                  <Sun
+                    size={17}
+                    className={`theme-toggle-symbol ${isDark ? "is-active" : "is-inactive"
+                      }`}
+                  />
+
+                  <Moon
+                    size={17}
+                    className={`theme-toggle-symbol ${isDark ? "is-inactive" : "is-active"
+                      }`}
+                  />
+                </span>
               </button>
 
               {!loading &&
@@ -607,7 +684,7 @@ const Navbar = () => {
           className="relative mx-auto flex w-full max-w-2xl flex-1 flex-col items-stretch justify-center gap-1 px-6 pb-4 pt-[calc(6rem+env(safe-area-inset-top,0px))] text-center sm:px-10"
         >
           {NAV_LINKS.map((link, i) => {
-            const isActive = activeKey === link.to;
+            const isActive = displayKey === link.to;
 
             return (
               <NavLink
@@ -616,7 +693,7 @@ const Navbar = () => {
                 end={link.to === "/"}
                 tabIndex={menuOpen ? 0 : -1}
                 onClick={handleNavClick(link.to)}
-                aria-current={isActive ? "page" : undefined}
+                aria-current={activeKey === link.to ? "page" : undefined}
                 style={{
                   color: isActive ? "var(--primary-text)" : "var(--text)",
                   transitionDelay: menuOpen ? `${280 + i * 70}ms` : "0ms",

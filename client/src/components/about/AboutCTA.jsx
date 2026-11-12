@@ -42,18 +42,18 @@ export default function AboutCTA() {
     }, []);
 
     return (
-        <section ref={sectionRef} className="px-5 pb-16 sm:px-8 sm:pb-24">
+        <section ref={sectionRef} className="min-h-[100svh] w-full">
             <motion.div
                 initial={reduce ? false : { opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
                 transition={{ duration: 0.8, ease: EASE }}
-                className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl px-6 pb-36 pt-12 sm:px-12 sm:pt-16 lg:px-16 lg:pb-48"
+                className="relative flex min-h-[100svh] w-full flex-col justify-center overflow-hidden px-6 pb-36 pt-16 sm:px-12 lg:px-16 lg:pb-48"
                 style={{ backgroundColor: "var(--primary)", color: "#ffffff" }}
             >
-                <div className="relative z-10 flex flex-col justify-between gap-10 lg:flex-row lg:items-end">
+                <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col justify-between gap-10 lg:flex-row lg:items-end">
                     <div className="max-w-2xl">
-                        <h2 className="text-2xl font-extrabold leading-tight tracking-[-0.04em] text-white min-[400px]:text-3xl sm:text-4xl lg:text-5xl">
+                        <h2 className="text-3xl font-extrabold leading-tight tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
                             Have a question? Start with the FAQ.
                         </h2>
                         <p className="mt-5 max-w-xl text-base leading-7 text-white/85">
@@ -86,7 +86,7 @@ export default function AboutCTA() {
                     </div>
                 </div>
 
-                {/* oversized wordmark, clipped by the card */}
+                {/* oversized wordmark, clipped by the section */}
                 <span
                     ref={wordmarkRef}
                     aria-hidden="true"
